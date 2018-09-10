@@ -10,6 +10,7 @@
 //  the file LICENCE.GPL
 //=============================================================================
 
+#include <cassert>
 #include "stafflines.h"
 #include "system.h"
 #include "measure.h"
@@ -132,6 +133,13 @@ void StaffLines::draw(QPainter* painter) const
       painter->setPen(QPen(curColor(), lw, Qt::SolidLine, Qt::FlatCap));
       painter->drawLines(lines);
       }
+
+void StaffLines::paintMask(std::vector<QRectF>& v) const
+{
+    if (lines.size() == 0) return;
+    assert (lines[0].y1() == lines[0].y2());
+    v.push_back(QRectF(lines[0].p1() + pagePos(), lines.back().p2() + pagePos()));
+}
 
 //---------------------------------------------------------
 //   y1

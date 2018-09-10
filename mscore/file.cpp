@@ -14,6 +14,7 @@
  File handling: loading and saving.
  */
 
+#include "all.h"
 #include "config.h"
 #include "globals.h"
 #include "musescore.h"
@@ -21,6 +22,7 @@
 #include "exportmidi.h"
 #include "libmscore/xml.h"
 #include "libmscore/element.h"
+#include "libmscore/ledgerline.h"
 #include "libmscore/note.h"
 #include "libmscore/rest.h"
 #include "libmscore/sig.h"
@@ -77,7 +79,7 @@
 #include "scorecmp/scorecmp.h"
 #include "extension.h"
 #include "tourhandler.h"
-
+#include <fstream>
 #ifdef OMR
 #include "omr/omr.h"
 #include "omr/omrpage.h"
@@ -87,7 +89,7 @@
 #include "libmscore/chordlist.h"
 #include "libmscore/mscore.h"
 #include "thirdparty/qzip/qzipreader_p.h"
-
+#include <glog/logging.h>
 
 namespace Ms {
 
@@ -2534,6 +2536,69 @@ static QRect trim(QImage source, int margin)
 //    return true on success.  Works with editor, shows additional windows.
 //---------------------------------------------------------
 
+const SysStaff* FindSysStaff(const Element* p) {
+    const MeasureBase* m = p->findMeasureBase();
+    const System* sys = nullptr;
+        for (auto* x = p; x; x = x->parent()) {
+            if (x->isSystem()) {
+                sys = toSystem(x);
+                break;
+            }
+        }
+        const int idx = p->staffIdx();
+    if (sys == nullptr || idx < 0 || idx >= sys->staves()->size()) return 0;
+    return sys->staff(idx);
+}
+
+static void savePieces(const QList<Element*> & vel, const QString& fname, double mag ) {
+      std::map<const SysStaff*, MusicOCR::Staff*> m;
+      MusicOCR::Layout layout;
+      for (const Element* el : vel) {
+            if (const StaffLines* stafflines = dynamic_cast<const StaffLines*>(el)) {
+                  const SysStaff* ss = FindSysStaff(stafflines);
+                  CHECK(ss);
+                  MusicOCR::Staff*& mstaff = m[ss];
+                  if (!mstaff) mstaff = layout.add_staff();
+                  stafflines->updateStaff(mstaff);
+                  }
+            }
+      for (MusicOCR::Staff& ms : *layout.mutable_staff()) {
+            ms.set_x1(ms.x1() * mag);
+            ms.set_x2(ms.x2() * mag);
+            ms.set_dy(ms.dy() * mag);
+            ms.set_y(ms.y() * mag);
+            }
+      static const string ignore[] = {"Text", "Image", "Page", "VBox", "LayoutBreak"};
+      for (const Element* p : vel) {
+            if (!dynamic_cast<const StaffLines*>(p)) {
+                  auto* ss = FindSysStaff(p);
+                  if (!ss) {
+                        if (std::find(begin(ignore), end(ignore), p->name()) == end(ignore)) {
+                              cerr << "Bad Element: " << p->name() << endl;
+                              }
+                        continue;
+                        }
+                  MusicOCR::Staff* mstaff = m[ss];
+                  if (!mstaff) {
+                        cerr << "incosistent staff " << p->name() << endl;
+                        continue;
+                        }
+                  if (const LedgerLine* ll = dynamic_cast<const LedgerLine*>(p)) {
+                              auto* xll = mstaff -> add_ledger();
+                              xll->set_x1(ll->pagePos().x() * mag);
+                              xll->set_x2(xll->x1() + ll->len() * mag);
+                              xll->set_y(ll->pagePos().y() * mag);
+                        } else {
+                              p->AddToProto(mstaff, mag);
+                        }
+                  }
+            }
+      std::ofstream ost((fname+".pb").toStdString().c_str(),ios::binary);
+      ost << layout.SerializeAsString();
+      cerr << "Found Staff: " << layout.staff_size() << endl;
+      }
+
+
 bool MuseScore::savePng(Score* score, const QString& name)
       {
       const QList<Page*>& pl = score->pages();
@@ -2573,7 +2638,7 @@ bool MuseScore::savePng(Score* score, const QString& name)
             QFile f(fileName);
             if (!f.open(QIODevice::WriteOnly))
                   return false;
-            bool rv = savePng(score, &f, pageNumber);
+            bool rv = savePng(score, &f, fileName, pageNumber);
             if (!rv)
                   return false;
             }
@@ -2585,10 +2650,11 @@ bool MuseScore::savePng(Score* score, const QString& name)
 //    return true on success
 //---------------------------------------------------------
 
-bool MuseScore::savePng(Score* score, QIODevice* device, int pageNumber)
+bool MuseScore::savePng(Score* score, QIODevice* device, const QString& fileName, int pageNumber)
       {
       const bool screenshot = false;
-      const bool transparent = preferences.getBool(PREF_EXPORT_PNG_USETRANSPARENCY);
+      bool transparent = preferences.getBool(PREF_EXPORT_PNG_USETRANSPARENCY);
+      transparent = false;
       const double convDpi = preferences.getDouble(PREF_EXPORT_PNG_RESOLUTION);
       const int localTrimMargin = trimMargin;
       const QImage::Format format = QImage::Format_ARGB32_Premultiplied;
@@ -2648,6 +2714,9 @@ bool MuseScore::savePng(Score* score, QIODevice* device, int pageNumber)
             printer = printer.convertToFormat(QImage::Format_Indexed8, colorTable);
             }
       printer.save(device, "png");
+      if (fileName != "") {
+            savePieces(pel, fileName, mag_);
+      }
       score->setPrinting(false);
       MScore::pixelRatio = pr;
       return rv;
@@ -3128,7 +3197,7 @@ bool MuseScore::exportAllMediaFiles(const QString& inFilePath, const QString& ou
             QByteArray pngData;
             QBuffer pngDevice(&pngData);
             pngDevice.open(QIODevice::ReadWrite);
-            res &= mscore->savePng(score, &pngDevice, i);
+            res &= mscore->savePng(score, &pngDevice, "",  i);
             QJsonValue pngJson(QString::fromLatin1(pngData.toBase64()));
             pngsJsonArray.append(pngJson);
             QByteArray svgData;
