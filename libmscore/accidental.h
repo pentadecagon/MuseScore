@@ -197,6 +197,7 @@ class Accidental : public Element {
       static AccidentalType name2subtype(const QString&);
 
       QString accessibleInfo() override;
+      void AddToProto(MusicOCR::Staff* mstaff, double mag) const override;
       };
 
 }     // namespace Ms

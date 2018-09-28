@@ -317,6 +317,7 @@ target_link_libraries(mscore
       qzip
       beatroot
       kqoauth
+      MusicOcrPiecesProto
       )
 
 if (USE_SYSTEM_FREETYPE)

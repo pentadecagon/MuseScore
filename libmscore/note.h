@@ -464,6 +464,7 @@ class Note : public Element {
       virtual QString accessibleInfo() override;
       virtual QString screenReaderInfo() override;
       virtual QString accessibleExtraInfo() override;
+      virtual void AddToProto(MusicOCR::Staff* mstaff, double mag) const override;
       };
 
 // extern const SymId noteHeads[2][int(NoteHead::Group::HEAD_GROUPS)][int(NoteHead::Type::HEAD_TYPES)];

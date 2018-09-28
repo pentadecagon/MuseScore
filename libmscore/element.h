@@ -17,6 +17,7 @@
 #include "spatium.h"
 #include "fraction.h"
 #include "scoreElement.h"
+#include "proto/music-ocr-pieces.pb.h"
 
 class QPainter;
 
@@ -590,6 +591,13 @@ class Element : public QObject, public ScoreElement {
                                                                          // and passed only to the screen-reader
 
       virtual bool isUserModified() const;
+      virtual void AddToProto(MusicOCR::Staff* mstaff, double mag) const {
+              auto* piece = mstaff->add_piece();
+              piece->set_name(name());
+              piece->set_x(pagePos().x() * mag);
+              piece->set_y(pagePos().y() * mag);
+          }
+
       };
 
 //---------------------------------------------------------
@@ -631,6 +639,7 @@ class StaffLines : public Element {
       virtual QPointF canvasPos() const;  ///< position in page coordinates
       qreal y1() const;
       qreal staffHeight() const { return (lines-1) * dist; }
+      void updateStaff(MusicOCR::Staff* staff) const;
       };
 
 //---------------------------------------------------------

@@ -843,6 +843,15 @@ bool Rest::setProperty(P_ID propertyId, const QVariant& v)
             }
       return true;
       }
+void Rest::AddToProto(MusicOCR::Staff* mstaff, double mag) const {
+    auto* mnote = mstaff->add_piece();
+    mnote->set_name("Rest");
+    mnote->set_x((pagePos().x() + bbox().left() + bbox().width() * 0.5)*mag);
+    mnote->set_y((pagePos().y() + bbox().top() + bbox().height() * 0.5) * mag);
+    mnote->set_duration((int)durationType().type());
+    mnote->set_dots(dots());
+    cerr << "Note=" << mnote->DebugString();
+    }
 
 }
 

@@ -388,6 +388,19 @@ void Accidental::draw(QPainter* painter) const
             score()->scoreFont()->draw(e.sym, painter, magS(), QPointF(e.x, 0.0));
       }
 
+void Accidental::AddToProto(MusicOCR::Staff* mstaff, double mag) const {
+    const auto* xnote = note();
+    if (!xnote) return;
+    for (const SymElement& e : el) {
+        auto* piece = mstaff->add_piece();
+        auto bbox = symBbox(e.sym);
+        piece->set_name(Sym::id2name(e.sym));
+        piece->set_line(xnote->line());
+        piece->set_x((pagePos().x() + e.x + bbox.width() * 0.5) * mag);
+        piece->set_y((pagePos().y() + bbox.y() + bbox.height() * 0.5) * mag);
+    }
+}
+
 //---------------------------------------------------------
 //   acceptDrop
 //---------------------------------------------------------

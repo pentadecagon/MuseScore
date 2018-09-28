@@ -20,7 +20,8 @@
 project(mscore)
 
 #minimum tested, report if it works with older
-CMAKE_MINIMUM_REQUIRED(VERSION 2.8.7)
+CMAKE_MINIMUM_REQUIRED(VERSION 3.0.0)
+add_subdirectory(/home/kunert/git/main/MusicOCR/proto proto)
 
 set (CI $ENV{CI})
 if (CI)

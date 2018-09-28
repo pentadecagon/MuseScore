@@ -13,6 +13,8 @@
 #ifndef __SPATIUM_H__
 #define __SPATIUM_H__
 
+#include "all.h"
+
 namespace Ms {
 
 //---------------------------------------------------------

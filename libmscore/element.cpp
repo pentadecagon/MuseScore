@@ -954,6 +954,24 @@ void StaffLines::draw(QPainter* painter) const
       painter->drawLines(ll);
       }
 
+void StaffLines::updateStaff(MusicOCR::Staff* staff) const
+{
+    QPointF p = pagePos();
+    if (staff->x1() == 0) {
+        // empty
+        staff->set_x0(p.x());
+        staff->set_x1(p.x() + width());
+        assert(staff->x0() <= staff->x1());
+        staff->set_y(p.y());
+        staff->set_dy(dist);
+        assert(staff->dy() > 0);
+        staff->set_nlines(lines);
+    } else {
+        staff->set_x0(min((double)staff->x0(), p.x()));
+        staff->set_x1(max((double)staff->x1(), p.x() + width()));
+    }
+}
+
 //---------------------------------------------------------
 //   y1
 //---------------------------------------------------------

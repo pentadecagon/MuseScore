@@ -358,6 +358,22 @@ void Clef::draw(QPainter* painter) const
             }
       }
 
+void Clef::AddToProto(MusicOCR::Staff* mstaff, double mag) const {
+    foreach(Element* e, elements) {
+          QPointF pt(e->pos());
+          Symbol* symbol = dynamic_cast<Symbol*>(e);
+          if (!symbol) continue;
+          auto symId = symbol->sym();
+         auto center = symBbox(symId).center() + pagePos() + e->pos();
+        auto* piece = mstaff->add_piece();
+        piece->set_name(Sym::id2name(symId));
+        piece->set_line(ClefInfo::line(clefType()));
+        piece->set_x(center.x() * mag);
+        piece->set_y((pagePos().y() + e->pos().y())* mag);
+   }
+}
+
+
 //---------------------------------------------------------
 //   acceptDrop
 //---------------------------------------------------------

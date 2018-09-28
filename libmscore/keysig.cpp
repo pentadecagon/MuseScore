@@ -289,6 +289,18 @@ void KeySig::draw(QPainter* p) const
             }
       }
 
+void KeySig::AddToProto(MusicOCR::Staff* mstaff, double mag) const {
+    for (const KeySym& ks: _sig.keySymbols()) {
+        auto center = symBbox(ks.sym).translated(ks.pos).translated(pagePos()).center();
+        auto* piece = mstaff->add_piece();
+        piece->set_name(Sym::id2name(ks.sym));
+        piece->set_line(std::lround(ks.spos.y() * 2));
+        piece->set_x(center.x() * mag);
+        piece->set_y((ks.pos.y() + pagePos().y()) * mag);
+    }
+}
+
+
 //---------------------------------------------------------
 //   acceptDrop
 //---------------------------------------------------------

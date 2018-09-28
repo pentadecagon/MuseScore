@@ -74,7 +74,7 @@
 #include "svggenerator.h"
 #include "scorePreview.h"
 #include "extension.h"
-
+#include <fstream>
 #ifdef OMR
 #include "omr/omr.h"
 #include "omr/omrpage.h"
@@ -2397,6 +2397,54 @@ bool MuseScore::savePng(Score* score, const QString& name)
       return savePng(score, name, false, preferences.pngTransparent, converterDpi, trimMargin, QImage::Format_ARGB32_Premultiplied);
       }
 
+const SysStaff* FindSysStaff(const Element* p) {
+    const System* sys = nullptr;
+    for (auto* x = p; x && sys==nullptr; x = x->parent()) {
+        sys = dynamic_cast<const System*>(x);
+    }
+    if (sys == nullptr || p->staffIdx() < 0) return 0;
+    return sys->staff(p->staffIdx());
+}
+
+static void savePieces(const QList<const Element*> & vel, const QString& fname, double mag ) {
+    std::map<const SysStaff*, MusicOCR::Staff*> m;
+    MusicOCR::Layout layout;
+    for (const Element* el : vel) {
+        if (const StaffLines* stafflines = dynamic_cast<const StaffLines*>(el)) {
+            const SysStaff* ss = FindSysStaff(stafflines);
+            assert(ss);
+            MusicOCR::Staff*& mstaff = m[ss];
+            if (!mstaff) mstaff = layout.add_staff();
+            stafflines->updateStaff(mstaff);
+        }
+    }
+    for (MusicOCR::Staff& ms : *layout.mutable_staff()) {
+        ms.set_x0(ms.x0() * mag);
+        ms.set_x1(ms.x1() * mag);
+        ms.set_dy(ms.dy() * mag);
+        ms.set_y(ms.y() * mag);
+    }
+    for (const Element* p : vel) {
+        if (!dynamic_cast<const StaffLines*>(p)) {
+            auto* ss = FindSysStaff(p);
+            if (!ss) {
+                cerr << "Bad Element: " << p->name() << endl;
+                continue;
+            }
+            MusicOCR::Staff* mstaff = m[ss];
+            if (!mstaff) {
+                cerr << "incosistent staff" << endl;
+                abort();
+            }
+            p->AddToProto(mstaff, mag);
+        }
+    }
+    std::ofstream ost((fname+".pb").toStdString().c_str(),ios::binary);
+    ost << layout.SerializeAsString();
+    cerr << "Found Staff: " << layout.staff_size() << endl;
+}
+
+
 //---------------------------------------------------------
 //   savePng with options
 //    return true on success
@@ -2406,7 +2454,7 @@ bool MuseScore::savePng(Score* score, const QString& name, bool screenshot, bool
       {
       bool rv = true;
       score->setPrinting(!screenshot);    // dont print page break symbols etc.
-
+      transparent = false;
       QImage::Format f;
       if (format != QImage::Format_Indexed8)
           f = format;
@@ -2496,6 +2544,7 @@ bool MuseScore::savePng(Score* score, const QString& name, bool screenshot, bool
             rv = printer.save(fileName, "png");
             if (!rv)
                   break;
+            savePieces(pel, fileName, mag);
             }
       score->setPrinting(false);
       return rv;
