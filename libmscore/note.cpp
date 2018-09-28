@@ -3298,4 +3298,15 @@ void Note::undoUnlink()
             e->undoUnlink();
       }
 
-}
+void Note::AddToProto(MusicOCR::Staff* mstaff, double mag) const {
+    auto* mnote = mstaff->add_piece();
+    mnote->set_name("Note");
+    mnote->set_line(line());
+    mnote->set_x((pagePos().x() + noteheadCenterX())*mag);
+    mnote->set_y(pagePos().y() * mag);
+    mnote->set_duration((int)chord()->durationType().type());
+    mnote->set_dots(chord()->dots());
+    cerr << "Note=" << mnote->DebugString();
+    }
+
+} // namespace

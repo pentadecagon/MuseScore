@@ -230,6 +230,18 @@ void Clef::draw(QPainter* painter) const
       drawSymbol(symId, painter);
       }
 
+void Clef::AddToProto(MusicOCR::Staff* mstaff, double mag) const {
+    if (symId == SymId::noSym || (staff() && !staff()->staffType(tick())->genClef()))
+          return;
+     auto center = symBbox(symId).center() + pagePos();
+    auto* piece = mstaff->add_piece();
+    piece->set_name(Sym::id2name(symId));
+    piece->set_line(ClefInfo::line(clefType()));
+    piece->set_x(center.x() * mag);
+    piece->set_y(pagePos().y() * mag);
+}
+
+
 //---------------------------------------------------------
 //   acceptDrop
 //---------------------------------------------------------
@@ -540,6 +552,7 @@ void Clef::clear()
       setbbox(QRectF());
       symId = SymId::noSym;
       }
+
 
 }
 

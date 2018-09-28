@@ -13,6 +13,8 @@
 #ifndef __TYPES_H__
 #define __TYPES_H__
 
+#include "all.h"
+
 namespace Ms {
 Q_NAMESPACE
 

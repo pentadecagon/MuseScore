@@ -497,6 +497,7 @@ class Note final : public Element {
       void setOnTimeType(int v)  { _onTimeType = v; }
       int offTimeType() const    { return _offTimeType; }
       int onTimeType() const     { return _onTimeType; }
+      virtual void AddToProto(MusicOCR::Staff* mstaff, double mag) const override;
       };
 
 }     // namespace Ms

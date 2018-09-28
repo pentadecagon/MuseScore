@@ -141,6 +141,27 @@ void StaffLines::paintMask(std::vector<QRectF>& v) const
     v.push_back(QRectF(lines[0].p1() + pagePos(), lines.back().p2() + pagePos()));
 }
 
+double xmin(double x, double y) { return x < y ? x : y; }
+double xmax(double y, double x) { return x < y ? x : y; }
+
+void StaffLines::updateStaff(MusicOCR::Staff* staff) const
+{
+    auto p = pagePos();
+    if (staff->x1() == 0) {
+        // empty
+        staff->set_x0(lines[0].x1() + p.x());
+        staff->set_x1(lines[0].x2() + p.x());
+        assert(staff->x0() <= staff->x1());
+        staff->set_y(lines[0].y1() + p.y());
+        staff->set_dy(lines[1].y1() - lines[0].y1());
+        assert(staff->dy() > 0);
+        staff->set_nlines(lines.size());
+    } else {
+        staff->set_x0(xmin(staff->x0(), lines[0].x1())+p.x());
+        staff->set_x1(xmax(staff->x1(), lines[0].x2())+p.x());
+    }
+}
+
 //---------------------------------------------------------
 //   y1
 //---------------------------------------------------------
