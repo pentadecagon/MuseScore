@@ -21,7 +21,9 @@ project(mscore)
 
 # Minimum tested, report if it works with older
 CMAKE_MINIMUM_REQUIRED(VERSION 3.0.0)
-add_subdirectory(/home/kunert/git/main/MusicOCR/proto proto)
+add_subdirectory(../main/MusicOCR/proto proto)
+
+find_package(glog REQUIRED)
 
 set (CI $ENV{CI})
 if (CI)

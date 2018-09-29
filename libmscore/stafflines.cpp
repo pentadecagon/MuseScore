@@ -10,13 +10,13 @@
 //  the file LICENCE.GPL
 //=============================================================================
 
-#include <cassert>
 #include "stafflines.h"
 #include "system.h"
 #include "measure.h"
 #include "score.h"
 #include "stafftype.h"
 #include "staff.h"
+#include "glog/logging.h"
 
 // Anatomy of StaffLines:
 //
@@ -146,19 +146,24 @@ double xmax(double y, double x) { return x < y ? x : y; }
 
 void StaffLines::updateStaff(MusicOCR::Staff* staff) const
 {
-    auto p = pagePos();
+    CHECK_GT(lines.size(), 1);
+    const auto& line0 = lines[0];
+    CHECK_EQ(line0.y1(), line0.y2());
+    const  auto p = pagePos();
+    const double y0 = line0.y1() + p.y();
     if (staff->x1() == 0) {
         // empty
-        staff->set_x0(lines[0].x1() + p.x());
-        staff->set_x1(lines[0].x2() + p.x());
+        staff->set_x0(line0.x1() + p.x());
+        staff->set_x1(line0.x2() + p.x());
         assert(staff->x0() <= staff->x1());
-        staff->set_y(lines[0].y1() + p.y());
+        staff->set_y(y0);
         staff->set_dy(lines[1].y1() - lines[0].y1());
-        assert(staff->dy() > 0);
+        CHECK(staff->dy() > 0);
         staff->set_nlines(lines.size());
     } else {
-        staff->set_x0(xmin(staff->x0(), lines[0].x1())+p.x());
-        staff->set_x1(xmax(staff->x1(), lines[0].x2())+p.x());
+        CHECK_EQ(staff->y(), y0);
+        staff->set_x0(xmin(staff->x0(), line0.x1())+p.x());
+        staff->set_x1(xmax(staff->x1(), line0.x2())+p.x());
     }
 }
 

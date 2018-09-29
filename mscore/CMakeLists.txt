@@ -469,6 +469,7 @@ target_link_libraries(mscore
       beatroot
       kqoauth
       MusicOcrPiecesProto
+      glog::glog
       )
 
 if (USE_SYSTEM_FREETYPE)
