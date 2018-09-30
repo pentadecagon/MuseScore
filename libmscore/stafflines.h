@@ -33,7 +33,6 @@ class StaffLines final : public Element {
       virtual void draw(QPainter*) const override;
       virtual QPointF pagePos() const override;    ///< position in page coordinates
       virtual QPointF canvasPos() const override;  ///< position in page coordinates
-      void paintMask(std::vector<QRectF> &v) const;
       void updateStaff(MusicOCR::Staff* staff) const;
 
       QVector<QLineF>& getLines() { return lines; }

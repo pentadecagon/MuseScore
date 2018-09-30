@@ -1019,7 +1019,6 @@ void Rest::AddToProto(MusicOCR::Staff* mstaff, double mag) const {
     mnote->set_y((pagePos().y() + bbox().top() + bbox().height() * 0.5) * mag);
     mnote->set_duration((int)durationType().type());
     mnote->set_dots(dots());
-    cerr << "Note=" << mnote->DebugString();
     }
 
 }

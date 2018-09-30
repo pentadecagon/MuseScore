@@ -146,7 +146,7 @@ double xmax(double y, double x) { return x < y ? x : y; }
 
 void StaffLines::updateStaff(MusicOCR::Staff* staff) const
 {
-    CHECK_GT(lines.size(), 1);
+    CHECK_GE(lines.size(), 1);
     const auto& line0 = lines[0];
     CHECK_EQ(line0.y1(), line0.y2());
     const  auto p = pagePos();
@@ -157,11 +157,13 @@ void StaffLines::updateStaff(MusicOCR::Staff* staff) const
         staff->set_x1(line0.x2() + p.x());
         assert(staff->x0() <= staff->x1());
         staff->set_y(y0);
+        staff->set_nlines(lines.size());
+        if (lines.size() == 1) return;
         staff->set_dy(lines[1].y1() - lines[0].y1());
         CHECK(staff->dy() > 0);
-        staff->set_nlines(lines.size());
     } else {
         CHECK_EQ(staff->y(), y0);
+        CHECK_EQ(lines.size(), staff->nlines());
         staff->set_x0(xmin(staff->x0(), line0.x1())+p.x());
         staff->set_x1(xmax(staff->x1(), line0.x2())+p.x());
     }

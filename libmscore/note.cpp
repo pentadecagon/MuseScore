@@ -3306,7 +3306,6 @@ void Note::AddToProto(MusicOCR::Staff* mstaff, double mag) const {
     mnote->set_y(pagePos().y() * mag);
     mnote->set_duration((int)chord()->durationType().type());
     mnote->set_dots(chord()->dots());
-    cerr << "Note=" << mnote->DebugString();
     }
 
 } // namespace
