@@ -134,13 +134,6 @@ void StaffLines::draw(QPainter* painter) const
       painter->drawLines(lines);
       }
 
-void StaffLines::paintMask(std::vector<QRectF>& v) const
-{
-    if (lines.size() == 0) return;
-    assert (lines[0].y1() == lines[0].y2());
-    v.push_back(QRectF(lines[0].p1() + pagePos(), lines.back().p2() + pagePos()));
-}
-
 double xmin(double x, double y) { return x < y ? x : y; }
 double xmax(double y, double x) { return x < y ? x : y; }
 
