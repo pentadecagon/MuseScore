@@ -135,7 +135,7 @@ void StaffLines::draw(QPainter* painter) const
       }
 
 double xmin(double x, double y) { return x < y ? x : y; }
-double xmax(double y, double x) { return x < y ? x : y; }
+double xmax(double x, double y) { return x > y ? x : y; }
 
 void StaffLines::updateStaff(MusicOCR::Staff* staff) const
 {
@@ -144,6 +144,7 @@ void StaffLines::updateStaff(MusicOCR::Staff* staff) const
     CHECK_EQ(line0.y1(), line0.y2());
     const  auto p = pagePos();
     const double y0 = line0.y1() + p.y();
+//    cerr << "FOund staff, x1=" << line0.x1() << " x2=" << line0.x2() << " p.x=" << p.x() << endl;
     if (staff->x1() == 0) {
         // empty
         staff->set_x0(line0.x1() + p.x());
@@ -157,8 +158,8 @@ void StaffLines::updateStaff(MusicOCR::Staff* staff) const
     } else {
         CHECK_EQ(staff->y(), y0);
         CHECK_EQ(lines.size(), staff->nlines());
-        staff->set_x0(xmin(staff->x0(), line0.x1())+p.x());
-        staff->set_x1(xmax(staff->x1(), line0.x2())+p.x());
+        staff->set_x0(xmin(staff->x0(), line0.x1()+p.x()));
+        staff->set_x1(xmax(staff->x1(), line0.x2()+p.x()));
     }
 }
 
