@@ -147,9 +147,9 @@ void StaffLines::updateStaff(MusicOCR::Staff* staff) const
 //    cerr << "FOund staff, x1=" << line0.x1() << " x2=" << line0.x2() << " p.x=" << p.x() << endl;
     if (staff->x1() == 0) {
         // empty
-        staff->set_x0(line0.x1() + p.x());
-        staff->set_x1(line0.x2() + p.x());
-        assert(staff->x0() <= staff->x1());
+        staff->set_x1(line0.x1() + p.x());
+        staff->set_x2(line0.x2() + p.x());
+        assert(staff->x1() <= staff->x2());
         staff->set_y(y0);
         staff->set_nlines(lines.size());
         if (lines.size() == 1) return;
@@ -158,8 +158,8 @@ void StaffLines::updateStaff(MusicOCR::Staff* staff) const
     } else {
         CHECK_EQ(staff->y(), y0);
         CHECK_EQ(lines.size(), staff->nlines());
-        staff->set_x0(xmin(staff->x0(), line0.x1()+p.x()));
-        staff->set_x1(xmax(staff->x1(), line0.x2()+p.x()));
+        staff->set_x1(xmin(staff->x1(), line0.x1()+p.x()));
+        staff->set_x2(xmax(staff->x2(), line0.x2()+p.x()));
     }
 }
 
