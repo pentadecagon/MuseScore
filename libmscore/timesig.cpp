@@ -346,6 +346,24 @@ void TimeSig::layout()
             }
       }
 
+void TimeSig::AddToProto(MusicOCR::Staff* mstaff, double mag) const {
+      MusicOCR::Piece* piece = mstaff->add_piece();
+      piece->set_x((pagePos().x() + bbox().left() + bbox().width() * 0.5) * mag);
+      piece->set_y((pagePos().y() + bbox().top() + bbox().height() * 0.5) * mag);
+      const TimeSigType sigType = timeSigType();
+      if (sigType ==  TimeSigType::FOUR_FOUR) {
+            piece->set_name("TimeSigCommon");
+            }
+      else if (sigType == TimeSigType::ALLA_BREVE) {
+            piece->set_name("TimeSigCutCommon");
+            }
+      else {
+            piece->set_name("TimeSig");
+            piece->set_timesig1(_sig.numerator());
+            piece->set_timesig2(_sig.denominator());
+            }
+      }
+
 //---------------------------------------------------------
 //   draw
 //---------------------------------------------------------

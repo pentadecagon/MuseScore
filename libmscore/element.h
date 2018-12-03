@@ -462,8 +462,8 @@ class Element : public ScoreElement {
       virtual void AddToProto(MusicOCR::Staff* mstaff, double mag) const {
               auto* piece = mstaff->add_piece();
               piece->set_name(name());
-              piece->set_x(pagePos().x() * mag);
-              piece->set_y(pagePos().y() * mag);
+              piece->set_x((pagePos().x() + bbox().left() + bbox().width() * 0.5) * mag);
+              piece->set_y((pagePos().y() + bbox().top() + bbox().height() * 0.5) * mag);
           }
       };
 

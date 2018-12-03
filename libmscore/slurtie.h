@@ -90,6 +90,7 @@ class SlurTieSegment : public SpannerSegment {
       void read(XmlReader&);
       virtual void drawEditMode(QPainter*, EditData&) override;
       virtual void computeBezier(QPointF so = QPointF()) = 0;
+      virtual void AddToProto(MusicOCR::Staff* mstaff, double mag) const override;
       };
 
 //-------------------------------------------------------------------
