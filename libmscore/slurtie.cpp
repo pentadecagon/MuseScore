@@ -594,11 +594,21 @@ void SlurTieSegment::AddToProto(MusicOCR::Staff* mstaff, double mag) const {
       piece1->set_name("Slur1");
       piece1->set_x(p1.x() * mag);
       piece1->set_y(p1.y() * mag);
+      piece1->set_up(slurTie()->up());
 
       auto* piece2 = mstaff->add_piece();
       piece2->set_name("Slur2");
       piece2->set_x(p2.x() * mag);
       piece2->set_y(p2.y() * mag);
+      piece2->set_up(slurTie()->up());
+      if (slurTie()->up()) {
+            piece1->set_xref1(MusicOCR::Ref1::SlurStartUp);
+            piece2->set_xref1(MusicOCR::Ref1::SlurEndUp);
+            }
+      else {
+            piece1->set_xref1(MusicOCR::Ref1::SlurStartDown);
+            piece2->set_xref1(MusicOCR::Ref1::SlurEndDown);
+            }
     }
 }
 

@@ -139,6 +139,7 @@ class BarLine final : public Element {
       virtual QString accessibleExtraInfo() const override;
 
       static const std::vector<BarLineTableItem> barLineTable;
+      virtual void AddToProto(MusicOCR::Staff* mstaff, double mag) const override;
       };
 }     // namespace Ms
 

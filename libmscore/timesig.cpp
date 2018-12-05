@@ -352,15 +352,31 @@ void TimeSig::AddToProto(MusicOCR::Staff* mstaff, double mag) const {
       piece->set_y((pagePos().y() + bbox().top() + bbox().height() * 0.5) * mag);
       const TimeSigType sigType = timeSigType();
       if (sigType ==  TimeSigType::FOUR_FOUR) {
-            piece->set_name("TimeSigCommon");
+            piece->set_xref1(MusicOCR::Ref1::TimeSigCommon);
             }
       else if (sigType == TimeSigType::ALLA_BREVE) {
-            piece->set_name("TimeSigCutCommon");
+            piece->set_xref1(MusicOCR::Ref1::TimeSigCutCommon);
             }
       else {
-            piece->set_name("TimeSig");
-            piece->set_timesig1(_sig.numerator());
-            piece->set_timesig2(_sig.denominator());
+            const int num = _sig.numerator();
+            const int denom = _sig.denominator();
+
+            const string t1 = "TimeSigNum" + std::to_string(num);
+            MusicOCR::Ref1::ERef1 val1;
+            if (MusicOCR::Ref1::ERef1_Parse(t1, &val1)) {
+                  piece->set_xref1(val1);
+                  } else {
+                  piece->set_piece_error("Unknown TimeSig Num: " + t1 );
+                  }
+            MusicOCR::Piece* piece2 = mstaff->add_piece();
+            *piece2 =  *piece;
+            const string t2 = "TimeSigDenom" + std::to_string(denom);
+            MusicOCR::Ref1::ERef1 val2;
+            if (MusicOCR::Ref1::ERef1_Parse(t2, &val2)) {
+                  piece2->set_xref1(val2);
+                  } else {
+                  piece2->set_piece_error("Unknown TimeSig Denom: " + t2 );
+                  }
             }
       }
 
