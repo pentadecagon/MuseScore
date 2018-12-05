@@ -241,13 +241,13 @@ void Clef::AddToProto(MusicOCR::Staff* mstaff, double mag) const {
     piece->set_y(pagePos().y() * mag);
 
     if ( piece->name().substr(0, 5) == "gClef") {
-            piece->set_xref1(MusicOCR::Ref1::GClef);
+            piece->set_ref1(MusicOCR::Ref1::GClef);
           }
     else if ( piece->name().substr(0, 5) == "fClef") {
-          piece->set_xref1(MusicOCR::Ref1::FClef);
+          piece->set_ref1(MusicOCR::Ref1::FClef);
         }
     else if ( piece->name().substr(0, 5) == "cClef") {
-          piece->set_xref1(MusicOCR::Ref1::CClef);
+          piece->set_ref1(MusicOCR::Ref1::CClef);
         }
 }
 

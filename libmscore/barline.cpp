@@ -1310,16 +1310,16 @@ void BarLine::AddToProto(MusicOCR::Staff* mstaff, double mag) const {
       auto* piece = mstaff->add_piece();
       piece->set_x((pagePos().x() + bbox().left() + bbox().width() * 0.5) * mag);
       piece->set_y((pagePos().y() + bbox().top() + bbox().height() * 0.5) * mag);
-      piece->set_xref1(MusicOCR::Ref1::BarLine);
+      piece->set_ref1(MusicOCR::Ref1::BarLine);
       if (barLineType() == BarLineType::START_REPEAT) {
             auto* newpiece = mstaff->add_piece();
             *newpiece = *piece;
-            newpiece->set_xref1(MusicOCR::Ref1::RepeatStart);
+            newpiece->set_ref1(MusicOCR::Ref1::RepeatStart);
             }
       if (barLineType() == BarLineType::END_REPEAT) {
             auto* newpiece = mstaff->add_piece();
             *newpiece = *piece;
-            newpiece->set_xref1(MusicOCR::Ref1::RepeatEnd);
+            newpiece->set_ref1(MusicOCR::Ref1::RepeatEnd);
             }
       }
 }
