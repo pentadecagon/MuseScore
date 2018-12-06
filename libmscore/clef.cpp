@@ -235,20 +235,23 @@ void Clef::AddToProto(MusicOCR::Staff* mstaff, double mag) const {
           return;
      auto center = symBbox(symId).center() + pagePos();
     auto* piece = mstaff->add_piece();
-    piece->set_name(Sym::id2name(symId));
     piece->set_line(ClefInfo::line(clefType()));
     piece->set_x(center.x() * mag);
     piece->set_y(pagePos().y() * mag);
-
-    if ( piece->name().substr(0, 5) == "gClef") {
+    const string name = Sym::id2name(symId);
+    if ( name.substr(0, 5) == "gClef") {
             piece->set_ref1(MusicOCR::Ref1::GClef);
           }
-    else if ( piece->name().substr(0, 5) == "fClef") {
+    else if ( name.substr(0, 5) == "fClef") {
           piece->set_ref1(MusicOCR::Ref1::FClef);
         }
-    else if ( piece->name().substr(0, 5) == "cClef") {
+    else if ( name.substr(0, 5) == "cClef") {
           piece->set_ref1(MusicOCR::Ref1::CClef);
         }
+    else {
+          piece->set_name(name);
+          piece->set_piece_error("Bad Clef: " + name);
+          }
 }
 
 

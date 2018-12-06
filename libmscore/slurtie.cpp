@@ -591,13 +591,11 @@ void SlurTieSegment::AddToProto(MusicOCR::Staff* mstaff, double mag) const {
       auto p2 = pagePos() + ups(Grip::END).p;
 
       auto* piece1 = mstaff->add_piece();
-      piece1->set_name("Slur1");
       piece1->set_x(p1.x() * mag);
       piece1->set_y(p1.y() * mag);
       piece1->set_up(slurTie()->up());
 
       auto* piece2 = mstaff->add_piece();
-      piece2->set_name("Slur2");
       piece2->set_x(p2.x() * mag);
       piece2->set_y(p2.y() * mag);
       piece2->set_up(slurTie()->up());
