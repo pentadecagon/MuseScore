@@ -274,6 +274,13 @@ void BarLine::getY() const
                   }
             }
 
+      if (staffIdx1 != staffIdx2) {
+            BarLine* b2 = toBarLine(segment()->element(staffIdx2 * VOICES));
+            if (b2) b2->_go_up = true;
+            else abort();
+            _go_down = true;
+            }
+
       System* system = measure->system();
       if (!system)
             return;
@@ -1307,9 +1314,11 @@ QString BarLine::accessibleExtraInfo() const
       }
 
 void BarLine::AddToProto(MusicOCR::Staff* mstaff, double mag) const {
+      const auto y = measure()->staffLines(staffIdx())->bbox().center().y();
+
       auto* piece = mstaff->add_piece();
       piece->set_x((pagePos().x() + bbox().left() + bbox().width() * 0.5) * mag);
-      piece->set_y((pagePos().y() + bbox().top() + bbox().height() * 0.5) * mag);
+      piece->set_y((pagePos().y() + y) * mag);
       piece->set_ref1(MusicOCR::Ref1::BarLine);
       if (barLineType() == BarLineType::START_REPEAT) {
             auto* newpiece = mstaff->add_piece();
@@ -1321,6 +1330,17 @@ void BarLine::AddToProto(MusicOCR::Staff* mstaff, double mag) const {
             *newpiece = *piece;
             newpiece->set_ref1(MusicOCR::Ref1::RepeatEnd);
             }
+      if (_go_up) {
+            auto* newpiece = mstaff->add_piece();
+            *newpiece = *piece;
+            newpiece->set_ref1(MusicOCR::Ref1::BarLineUp);
+            }
+      if (_go_down) {
+            auto* newpiece = mstaff->add_piece();
+            *newpiece = *piece;
+            newpiece->set_ref1(MusicOCR::Ref1::BarLineDown);
+            }
+
       }
 }
 
