@@ -112,7 +112,7 @@ Fraction DurationElement::afrac() const
             return f.reduced();
             }
       else
-            return Element::afrac();
+            return Fraction::fromTicks(tick());
       }
 
 //---------------------------------------------------------
@@ -125,7 +125,7 @@ Fraction DurationElement::rfrac() const
             if (Measure* m = measure())
                   return afrac() - m->afrac();
             }
-      return Element::rfrac();
+      return Fraction::fromTicks(rtick());
       }
 
 //---------------------------------------------------------
@@ -189,6 +189,7 @@ bool DurationElement::setProperty(Pid propertyId, const QVariant& v)
             case Pid::DURATION: {
                   Fraction f(v.value<Fraction>());
                   setDuration(f);
+                  // TODO: do we really need to re-layout all here?
                   score()->setLayoutAll();
                   }
                   break;

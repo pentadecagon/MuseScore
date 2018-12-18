@@ -207,13 +207,13 @@ UndoStack::~UndoStack()
 //   beginMacro
 //---------------------------------------------------------
 
-void UndoStack::beginMacro()
+void UndoStack::beginMacro(Score* score)
       {
       if (curCmd) {
             qWarning("already active");
             return;
             }
-      curCmd = new UndoCommand();
+      curCmd = new UndoMacro(score);
       }
 
 //---------------------------------------------------------
@@ -398,17 +398,10 @@ void UndoStack::redo(EditData* ed)
       }
 
 //---------------------------------------------------------
-//   SaveState
+//   UndoMacro
 //---------------------------------------------------------
 
-SaveState::SaveState(Score* s)
-   : undoInputState(s), redoInputState(s->inputState())
-      {
-      score = s;
-//      redoSelection  = score->selection();
-      }
-
-Element* SaveState::selectedElement(const Selection& sel)
+Element* UndoMacro::selectedElement(const Selection& sel)
       {
       if (sel.isSingle()) {
             Element* e = sel.element();
@@ -419,27 +412,42 @@ Element* SaveState::selectedElement(const Selection& sel)
       return nullptr;
       }
 
-void SaveState::undo(EditData*)
+UndoMacro::UndoMacro(Score* s)
+   : undoInputState(s->inputState()), redoInputState(s),
+   undoSelectedElement(selectedElement(s->selection())), score(s)
       {
-      redoInputState = score->inputState();
-//      redoSelection  = score->selection();
-      redoSelectedElement = selectedElement(score->selection());
-      score->setInputState(undoInputState);
-//      score->setSelection(undoSelection);
-      score->select(undoSelectedElement);
       }
 
-void SaveState::redo(EditData*)
+void UndoMacro::undo(EditData* ed)
+      {
+      redoInputState = score->inputState();
+      redoSelectedElement = selectedElement(score->selection());
+      score->deselectAll();
+
+      // Undo for child commands.
+      UndoCommand::undo(ed);
+
+      score->setInputState(undoInputState);
+      if (undoSelectedElement) {
+            score->deselectAll();
+            score->selection().add(undoSelectedElement);
+            }
+      }
+
+void UndoMacro::redo(EditData* ed)
       {
       undoInputState = score->inputState();
-//      undoSelection  = score->selection();
       undoSelectedElement = selectedElement(score->selection());
+      score->deselectAll();
+
+      // Redo for child commands.
+      UndoCommand::redo(ed);
+
       score->setInputState(redoInputState);
-//      score->setSelection(redoSelection);
-      if (first)
-            first = false;
-      else
-            score->select(redoSelectedElement);
+      if (redoSelectedElement) {
+            score->deselectAll();
+            score->selection().add(redoSelectedElement);
+            }
       }
 
 //---------------------------------------------------------
@@ -1142,18 +1150,13 @@ void ChangeMeasureLen::flip(EditData*)
       // to end of measure:
       //
 
-      Segment* s = measure->first();
       std::list<Segment*> sl;
-      for (; s;) {
-            Segment* ns = s->next();
-            if (!s->isEndBarLineType() && !s->isTimeSigAnnounceType()) {
-                  s = ns;
+      for (Segment* s = measure->first(); s; s = s->next()) {
+            if (!s->isEndBarLineType() && !s->isTimeSigAnnounceType())
                   continue;
-                  }
             s->setRtick(len.ticks());
             sl.push_back(s);
             measure->remove(s);
-            s = ns;
             }
       measure->setLen(len);
       measure->score()->fixTicks();
@@ -1480,6 +1483,8 @@ void ChangeStyleVal::flip(EditData*)
             score->style().set(idx, value);
             if (idx == Sid::chordDescriptionFile) {
                   score->style().chordList()->unload();
+                  if (score->styleB(Sid::chordsXmlFile))
+                      score->style().chordList()->read("chords.xml");
                   score->style().chordList()->read(value.toString());
                   }
             score->styleChanged();

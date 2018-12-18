@@ -381,6 +381,26 @@ void TimeSig::AddToProto(MusicOCR::Staff* mstaff, double mag) const {
       }
 
 //---------------------------------------------------------
+//   shape
+//---------------------------------------------------------
+
+Shape TimeSig::shape() const
+      {
+      QRectF box(bbox());
+      const Staff* st = staff();
+      if (st && autoplace()) {
+            // Extend time signature shape up and down to
+            // the first ledger line height to ensure that
+            // no notes will be too close to the timesig.
+            const qreal sp = spatium();
+            const qreal y = pos().y();
+            box.setTop(std::min(-sp - y, box.top()));
+            box.setBottom(std::max(st->height() - y + sp, box.bottom()));
+            }
+      return Shape(box);
+      }
+
+//---------------------------------------------------------
 //   draw
 //---------------------------------------------------------
 

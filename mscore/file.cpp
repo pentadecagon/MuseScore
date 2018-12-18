@@ -2921,6 +2921,9 @@ bool MuseScore::saveSvg(Score* score, QIODevice* device, int pageNumber)
                         continue;  // ignore invisible staves
                   if (s->staves()->isEmpty() || !s->staff(i)->show())
                         continue;
+                  Measure* fm = s->firstMeasure();
+                  if (!fm) // only boxes, hence no staff lines
+                        continue;
 
                   // The goal here is to draw SVG staff lines more efficiently.
                   // MuseScore draws staff lines by measure, but for SVG they can
@@ -2935,17 +2938,15 @@ bool MuseScore::saveSvg(Score* score, QIODevice* device, int pageNumber)
                   // are drawn by measure.
                   //
                   bool byMeasure = false;
-                  for (MeasureBase* mb = s->firstMeasure(); mb != 0; mb = s->nextMeasure(mb)) {
-                        if (mb->isHBox() || mb->isVBox() || !toMeasure(mb)->visible(i)) {
+                  for (MeasureBase* mb = fm; mb; mb = s->nextMeasure(mb)) {
+                        if (!mb->isMeasure() || !toMeasure(mb)->visible(i)) {
                               byMeasure = true;
                               break;
                               }
                         }
                   if (byMeasure) { // Draw visible staff lines by measure
-                        for (MeasureBase* mb = s->firstMeasure(); mb != 0; mb = s->nextMeasure(mb)) {
-                              if (mb->type() != ElementType::HBOX
-                               && mb->type() != ElementType::VBOX
-                               && static_cast<Measure*>(mb)->visible(i)) {
+                        for (MeasureBase* mb = fm; mb; mb = s->nextMeasure(mb)) {
+                              if (mb->isMeasure() && toMeasure(mb)->visible(i)) {
                                     StaffLines* sl = toMeasure(mb)->staffLines(i);
                                     printer.setElement(sl);
                                     paintElement(p, sl);
@@ -3041,6 +3042,10 @@ QPixmap MuseScore::extractThumbnail(const QString& name)
       return pm;
       }
 
+//---------------------------------------------------------
+//   saveMetadataJSON
+//---------------------------------------------------------
+      
 bool MuseScore::saveMetadataJSON(Score* score, const QString& name)
       {
       QFile f(name);
@@ -3053,7 +3058,7 @@ bool MuseScore::saveMetadataJSON(Score* score, const QString& name)
       f.close();
       return true;
       }
-
+      
 QJsonObject MuseScore::saveMetadataJSON(Score* score)
       {
       auto boolToString = [](bool b) { return b ? "true" : "false"; };
@@ -3174,22 +3179,62 @@ QJsonObject MuseScore::saveMetadataJSON(Score* score)
       return json;
       }
 
-bool MuseScore::exportAllMediaFiles(const QString& inFilePath, const QString& outFilePath)
+//---------------------------------------------------------
+//   exportMp3AsJSON
+//---------------------------------------------------------
+      
+bool MuseScore::exportMp3AsJSON(const QString& inFilePath, const QString& outFilePath)
       {
-      MasterScore* score = mscore->readScore(inFilePath);
-      score->switchToPageMode();
-
-      QJsonObject jsonForMedia;
-      bool res = true;
-
+      std::unique_ptr<MasterScore> score(mscore->readScore(inFilePath));
+      if (!score)
+            return false;
+      
       //export score audio
       QByteArray mp3Data;
       QBuffer mp3Device(&mp3Data);
       mp3Device.open(QIODevice::ReadWrite);
       bool dummy = false;
-      res &= mscore->saveMp3(score, &mp3Device, dummy);
-      QJsonValue mp3Json(QString::fromLatin1(mp3Data.toBase64()));
+      mscore->saveMp3(score.get(), &mp3Device, dummy);
+      
+      QJsonObject jsonForMedia;
+      jsonForMedia["mp3"] = QString::fromLatin1(mp3Data.toBase64());
+      
+      QJsonDocument jsonDoc(jsonForMedia);
+      const QString& jsonPath{outFilePath};
+      QFile file(jsonPath);
+      file.open(QIODevice::WriteOnly);
+      file.write(jsonDoc.toJson(QJsonDocument::Compact));
+      file.close();
+      return true;
+      }
+      
+//---------------------------------------------------------
+//   exportAllMediaFiles
+//---------------------------------------------------------
+      
+bool MuseScore::exportAllMediaFiles(const QString& inFilePath, const QString& outFilePath)
+      {
+      std::unique_ptr<MasterScore> score(mscore->readScore(inFilePath));
+      if (!score)
+            return false;
+      
+      score->switchToPageMode();
 
+      //// JSON specification ///////////////////////////
+      //jsonForMedia["pngs"] = pngsJsonArray;
+      //jsonForMedia["mposXML"] = mposJson;
+      //jsonForMedia["sposXML"] = sposJson;
+      //jsonForMedia["pdf"] = pdfJson;
+      //jsonForMedia["svgs"] = svgsJsonArray;
+      //jsonForMedia["midi"] = midiJson;
+      //jsonForMedia["mxml"] = mxmlJson;
+      //jsonForMedia["metadata"] = mdJson;
+      ///////////////////////////////////////////////////
+      
+      QJsonObject jsonForMedia;
+      bool res = true;
+
+      {
       //export score pngs and svgs
       QJsonArray pngsJsonArray;
       QJsonArray svgsJsonArray;
@@ -3197,75 +3242,69 @@ bool MuseScore::exportAllMediaFiles(const QString& inFilePath, const QString& ou
             QByteArray pngData;
             QBuffer pngDevice(&pngData);
             pngDevice.open(QIODevice::ReadWrite);
-            res &= mscore->savePng(score, &pngDevice, "",  i);
+            res &= mscore->savePng(score.get(), &pngDevice, "", i);
             QJsonValue pngJson(QString::fromLatin1(pngData.toBase64()));
             pngsJsonArray.append(pngJson);
             QByteArray svgData;
             QBuffer svgDevice(&svgData);
-            pngDevice.open(QIODevice::ReadWrite);
-            res &= mscore->saveSvg(score, &svgDevice, i);
+            svgDevice.open(QIODevice::ReadWrite);
+            res &= mscore->saveSvg(score.get(), &svgDevice, i);
             QJsonValue svgJson(QString::fromLatin1(svgData.toBase64()));
             svgsJsonArray.append(svgJson);
             }
-
+      jsonForMedia["pngs"] = pngsJsonArray;
+      jsonForMedia["svgs"] = svgsJsonArray;
+      }
+      
       //export score .spos
       QByteArray partDataPos;
       QBuffer partPosDevice(&partDataPos);
       partPosDevice.open(QIODevice::ReadWrite);
-      savePositions(score, &partPosDevice, true);
-      QJsonValue sposJson(QString::fromLatin1(partDataPos.toBase64()));
+      savePositions(score.get(), &partPosDevice, true);
+      jsonForMedia["sposXML"] = QString::fromLatin1(partDataPos.toBase64());
       partPosDevice.close();
       partDataPos.clear();
 
       //export score .mpos
       partPosDevice.open(QIODevice::ReadWrite);
-      savePositions(score, &partPosDevice, false);
-      QJsonValue mposJson(QString::fromLatin1(partDataPos.toBase64()));
+      savePositions(score.get(), &partPosDevice, false);
+      jsonForMedia["mposXML"] = QString::fromLatin1(partDataPos.toBase64());
 
       //export score pdf
       QByteArray pdfData;
       QBuffer pdfDevice(&pdfData);
       pdfDevice.open(QIODevice::ReadWrite);
       QPdfWriter writer(&pdfDevice);
-      res &= mscore->savePdf(score, writer);
-      QJsonValue pdfJson(QString::fromLatin1(pdfData.toBase64()));
+      res &= mscore->savePdf(score.get(), writer);
+      jsonForMedia["pdf"] = QString::fromLatin1(pdfData.toBase64());
 
       //export score midi
       QByteArray midiData;
       QBuffer midiDevice(&midiData);
       midiDevice.open(QIODevice::ReadWrite);
-      res &= mscore->saveMidi(score, &midiDevice);
-      QJsonValue midiJson(QString::fromLatin1(midiData.toBase64()));
+      res &= mscore->saveMidi(score.get(), &midiDevice);
+      jsonForMedia["midi"] = QString::fromLatin1(midiData.toBase64());
 
       //export musicxml
       QByteArray mxmlData;
       QBuffer mxmlDevice(&mxmlData);
       mxmlDevice.open(QIODevice::ReadWrite);
-      res &= saveMxl(score, &mxmlDevice);
-      QJsonValue mxmlJson(QString::fromLatin1(mxmlData.toBase64()));
+      res &= saveMxl(score.get(), &mxmlDevice);
+      jsonForMedia["mxml"] = QString::fromLatin1(mxmlData.toBase64());
 
       //export metadata
-      QJsonObject mdJson = mscore->saveMetadataJSON(score);
+      jsonForMedia["metadata"] = mscore->saveMetadataJSON(score.get());
 
-       //// JSON specification ///////////////////////////
-      jsonForMedia["mp3"] = mp3Json;
-      jsonForMedia["pngs"] = pngsJsonArray;
-      jsonForMedia["mposXML"] = mposJson;
-      jsonForMedia["sposXML"] = sposJson;
-      jsonForMedia["pdf"] = pdfJson;
-      jsonForMedia["svgs"] = svgsJsonArray;
-      jsonForMedia["midi"] = midiJson;
-      jsonForMedia["mxml"] = mxmlJson;
-      jsonForMedia["metadata"] = mdJson;
-      ///////////////////////////////////////////////////
       QJsonDocument jsonDoc(jsonForMedia);
-      const QString& jsonPath{outFilePath}; //{"D:\\123\\score.json"};
+      const QString& jsonPath{outFilePath};
       QFile file(jsonPath);
-      file.open(QIODevice::WriteOnly);
+      if (!file.open(QIODevice::WriteOnly))
+            return false;
+      
       file.write(jsonDoc.toJson(QJsonDocument::Compact));
       file.close();
-      delete score;
-      return true;
+      
+      return res;
       }
 
 }

@@ -117,7 +117,7 @@ PianorollEditor::PianorollEditor(QWidget* parent)
 
       tb->addSeparator();
 
-      tb->addWidget(new QLabel(tr("Subdiv:")));
+      tb->addWidget(new QLabel(tr("Subdiv.:")));
       subdiv = new QSpinBox;
       subdiv->setToolTip(tr("Subdivide the beat this many times"));
       subdiv->setMinimum(0);
@@ -133,7 +133,7 @@ PianorollEditor::PianorollEditor(QWidget* parent)
 
       tb->addWidget(new QLabel(tr("Stripe Pattern:")));
       barPattern = new QComboBox;
-      barPattern->setToolTip(tr("White key lines show the tones of this chord."));
+      barPattern->setToolTip(tr("White stripes show the tones of this chord."));
       for (int i = 0; !PianoView::barPatterns[i].name.isEmpty(); ++i) {
             barPattern->addItem(PianoView::barPatterns[i].name, i);
             }
@@ -513,9 +513,9 @@ void PianorollEditor::veloTypeChanged(int val)
                   break;
             }
 
-      _score->undoStack()->beginMacro();
+      _score->startCmd();
       _score->undo(new ChangeVelocity(note, Note::ValueType(val), newVelocity));
-      _score->undoStack()->endMacro(_score->undoStack()->current()->childCount() == 0);
+      _score->endCmd();
       updateVelocity(note);
       }
 
@@ -566,9 +566,9 @@ void PianorollEditor::velocityChanged(int val)
       if (val == note->veloOffset())
             return;
 
-      _score->undoStack()->beginMacro();
+      _score->startCmd();
       _score->undo(new ChangeVelocity(note, vt, val));
-      _score->undoStack()->endMacro(_score->undoStack()->current()->childCount() == 0);
+      _score->endCmd();
 
       pianoLevels->update();
       }
@@ -723,7 +723,21 @@ Element* PianorollEditor::elementNear(QPointF)
 
 void PianorollEditor::updateAll()
       {
-      startTimer(0);    // delayed update
+      if (updateScheduled)
+            return;
+
+      QTimer::singleShot(0, this, &PianorollEditor::doUpdate);
+      updateScheduled = true;
+      }
+
+//---------------------------------------------------------
+//   doUpdate
+//---------------------------------------------------------
+
+void PianorollEditor::doUpdate()
+      {
+      updateScheduled = false;
+
       if (staff && staff->idx() == -1) { // staff removed
             removeScore();
             return;

@@ -401,12 +401,12 @@ EditStyle::EditStyle(Score* s, QWidget* parent)
       tupletNumberType->clear();
       tupletNumberType->addItem(tr("Number"), int(TupletNumberType::SHOW_NUMBER));
       tupletNumberType->addItem(tr("Ratio"), int(TupletNumberType::SHOW_RELATION));
-      tupletNumberType->addItem(tr("Nothing"), int(TupletNumberType::NO_TEXT));
+      tupletNumberType->addItem(tr("None"), int(TupletNumberType::NO_TEXT));
 
       tupletBracketType->clear();
       tupletBracketType->addItem(tr("Automatic"), int(TupletBracketType::AUTO_BRACKET));
       tupletBracketType->addItem(tr("Bracket"), int(TupletBracketType::SHOW_BRACKET));
-      tupletBracketType->addItem(tr("Nothing"), int(TupletBracketType::SHOW_NO_BRACKET));
+      tupletBracketType->addItem(tr("None"), int(TupletBracketType::SHOW_NO_BRACKET));
 
       pageList->setCurrentRow(0);
       accidentalsGroup->setVisible(false); // disable, not yet implemented
@@ -504,6 +504,9 @@ EditStyle::EditStyle(Score* s, QWidget* parent)
       connect(chordsStandard,      SIGNAL(toggled(bool)),             SLOT(setChordStyle(bool)));
       connect(chordsJazz,          SIGNAL(toggled(bool)),             SLOT(setChordStyle(bool)));
       connect(chordsCustom,        SIGNAL(toggled(bool)),             SLOT(setChordStyle(bool)));
+      connect(chordsXmlFile,       SIGNAL(toggled(bool)),             SLOT(setChordStyle(bool)));
+      connect(chordDescriptionFile,&QLineEdit::editingFinished,       [=]() { setChordStyle(true); });
+      //chordDescriptionFile->setEnabled(false);
 
       connect(SwingOff,            SIGNAL(toggled(bool)),             SLOT(setSwingParams(bool)));
       connect(swingEighth,         SIGNAL(toggled(bool)),             SLOT(setSwingParams(bool)));
@@ -572,10 +575,20 @@ EditStyle::EditStyle(Score* s, QWidget* parent)
       connect(mapper2, SIGNAL(mapped(int)), SLOT(valueChanged(int)));
       textStyles->clear();
       for (auto ss : allTextStyles()) {
-            QListWidgetItem* item = new QListWidgetItem(textStyleUserName(ss));
+            QListWidgetItem* item = new QListWidgetItem(s->getTextStyleUserName(ss));
             item->setData(Qt::UserRole, int(ss));
             textStyles->addItem(item);
             }
+
+      textStyleFrameType->clear();
+      textStyleFrameType->addItem(tr("No frame"), int(FrameType::NO_FRAME));
+      textStyleFrameType->addItem(tr("Square"),   int(FrameType::SQUARE));
+      textStyleFrameType->addItem(tr("Circle"),   int(FrameType::CIRCLE));
+
+      resetTextStyleName->setIcon(*icons[int(Icons::reset_ICON)]);
+      connect(resetTextStyleName, &QToolButton::clicked, [=](){ resetUserStyleName(); });
+      connect(styleName, &QLineEdit::textEdited, [=]() { editUserStyleName(); });
+      connect(styleName, &QLineEdit::editingFinished, [=]() { endEditUserStyleName(); });
 
       // font face
       resetTextStyleFontFace->setIcon(*icons[int(Icons::reset_ICON)]);
@@ -1019,6 +1032,7 @@ void EditStyle::selectChordDescriptionFile()
       if (fn.isEmpty())
             return;
       chordDescriptionFile->setText(fn);
+      setChordStyle(true);
       }
 
 //---------------------------------------------------------
@@ -1056,24 +1070,31 @@ void EditStyle::setChordStyle(bool checked)
             return;
       QVariant val;
       QString file;
+      bool chordsXml;
       if (chordsStandard->isChecked()) {
             val  = QString("std");
             file = "chords_std.xml";
+            chordsXml = false;
             }
       else if (chordsJazz->isChecked()) {
             val  = QString("jazz");
             file = "chords_jazz.xml";
+            chordsXml = false;
             }
       else {
             val = QString("custom");
             chordDescriptionGroup->setEnabled(true);
+            file = chordDescriptionFile->text();
+            chordsXml = chordsXmlFile->isChecked();
             }
-      cs->undo(new ChangeStyleVal(cs, Sid::chordStyle, val));
-      if (!file.isEmpty()) {
-            cs->undo(new ChangeStyleVal(cs, Sid::chordsXmlFile, false));
-            chordsXmlFile->setChecked(false);
+      if (val != "custom") {
+            chordsXmlFile->setChecked(chordsXml);
             chordDescriptionGroup->setEnabled(false);
             chordDescriptionFile->setText(file);
+            }
+      cs->undo(new ChangeStyleVal(cs, Sid::chordsXmlFile, chordsXml));
+      cs->undo(new ChangeStyleVal(cs, Sid::chordStyle, val));
+      if (!file.isEmpty()) {
             cs->undo(new ChangeStyleVal(cs, Sid::chordDescriptionFile, file));
             cs->update();
             }
@@ -1335,7 +1356,10 @@ void EditStyle::textStyleChanged(int row)
                         break;
                   }
             }
-      }
+      styleName->setText(cs->getTextStyleUserName(tid));
+      styleName->setEnabled(int(tid) >= int(Tid::USER1));
+      resetTextStyleName->setEnabled(styleName->text() != textStyleUserName(tid));
+     }
 
 //---------------------------------------------------------
 //   textStyleValueChanged
@@ -1374,5 +1398,52 @@ void EditStyle::resetTextStyle(Pid pid)
       textStyleChanged(textStyles->currentRow());     // update GUI
       cs->update();
       }
+
+//---------------------------------------------------------
+//   editUserStyleName
+//---------------------------------------------------------
+
+void EditStyle::editUserStyleName()
+      {
+      int row = textStyles->currentRow();
+      Tid tid = Tid(textStyles->item(row)->data(Qt::UserRole).toInt());
+      textStyles->item(row)->setText(styleName->text());
+      resetTextStyleName->setEnabled(styleName->text() != textStyleUserName(tid));
+      }
+
+//---------------------------------------------------------
+//   endEditUserStyleName
+//---------------------------------------------------------
+
+void EditStyle::endEditUserStyleName()
+      {
+      int row = textStyles->currentRow();
+      Tid tid = Tid(textStyles->item(row)->data(Qt::UserRole).toInt());
+      int idx = int(tid) - int(Tid::USER1);
+      if ((idx < 0) || (idx > 5)) {
+            qDebug("User style index %d outside of range [0,5].", idx);
+            return;
+            }
+      Sid sid[] = { Sid::user1Name, Sid::user2Name, Sid::user3Name, Sid::user4Name, Sid::user5Name, Sid::user6Name };
+      QString name = styleName->text();
+      cs->undoChangeStyleVal(sid[idx], name);
+      if (name == "") {
+            name = textStyleUserName(tid);
+            styleName->setText(name);
+            textStyles->item(row)->setText(name);
+            resetTextStyleName->setEnabled(false);
+            }
+      MuseScoreCore::mscoreCore->updateInspector();
+      }
+//---------------------------------------------------------
+//   resetUserStyleName
+//---------------------------------------------------------
+
+void EditStyle::resetUserStyleName()
+      {
+      styleName->clear();
+      endEditUserStyleName();
+      }
+
 } //namespace Ms
 

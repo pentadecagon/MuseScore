@@ -186,14 +186,7 @@ Element::Element(const Element& e)
 
 Element::~Element()
       {
-#if 0
-      if (score() &&  flag(ElementFlag::SELECTED)) {
-            if (score()->selection().elements().removeOne(this))
-                  printf("remove element from selection\n");
-            else
-                  printf("element not in selection\n");
-            }
-#endif
+      Score::onElementDestruction(this);
       }
 
 //---------------------------------------------------------
@@ -918,7 +911,6 @@ Element* Element::create(ElementType type, Score* score)
             case ElementType::OTTAVA:            return new Ottava(score);
             case ElementType::TEXTLINE:          return new TextLine(score);
             case ElementType::NOTELINE:          return new NoteLine(score);
-            case ElementType::LYRICSLINE:        return new LyricsLine(score);
             case ElementType::TRILL:             return new Trill(score);
             case ElementType::LET_RING:          return new LetRing(score);
             case ElementType::VIBRATO:           return new Vibrato(score);
@@ -984,6 +976,7 @@ Element* Element::create(ElementType type, Score* score)
             case ElementType::BAGPIPE_EMBELLISHMENT: return new BagpipeEmbellishment(score);
             case ElementType::AMBITUS:           return new Ambitus(score);
 
+            case ElementType::LYRICSLINE:
             case ElementType::TEXTLINE_BASE:
             case ElementType::TEXTLINE_SEGMENT:
             case ElementType::GLISSANDO_SEGMENT:
@@ -1718,15 +1711,10 @@ int Element::rtick() const
 
 Fraction Element::rfrac() const
       {
-      const Element* e = this;
-      while (e) {
-            if (e->isSegment())
-                  return toSegment(e)->rfrac();
-            else if (e->isMeasureBase())
-                  return toMeasureBase(e)->rfrac();
-            e = e->parent();
-            }
-      return -1;
+      if (parent())
+            return parent()->rfrac();
+      else
+            return -1;
       }
 
 //---------------------------------------------------------
@@ -1736,15 +1724,10 @@ Fraction Element::rfrac() const
 
 Fraction Element::afrac() const
       {
-      const Element* e = this;
-      while (e) {
-            if (e->isSegment())
-                  return toSegment(e)->afrac();
-            else if (e->isMeasureBase())
-                  return toMeasureBase(e)->afrac();
-            e = e->parent();
-            }
-      return -1;
+      if (parent())
+            return parent()->afrac();
+      else
+            return -1;
       }
 
 //---------------------------------------------------------
@@ -2156,7 +2139,7 @@ void Element::autoplaceSegmentElement(qreal minDistance)
       if (visible() && autoplace() && parent()) {
             Segment* s = toSegment(parent());
             Measure* m = s->measure();
-            int si     = staffIdx();
+            int si     = systemFlag() ? m->system()->firstVisibleStaff() : staffIdx();
 
             SysStaff* ss = m->system()->staff(si);
             QRectF r = bbox().translated(m->pos() + s->pos() + pos());

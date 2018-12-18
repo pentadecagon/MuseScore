@@ -407,6 +407,9 @@ void ScoreView::measurePopup(QContextMenuEvent* ev, Measure* obj)
       menuAdd->addAction(getAction("insert-vbox"));
       menuAdd->addAction(getAction("insert-textframe"));
 
+      a = popup->addAction(tr("Delete Selected Measures"));
+      a->setData("delete-selected-measures");
+      
       popup->addSeparator();
 
       a = popup->addAction(tr("Measure Properties..."));
@@ -471,6 +474,9 @@ void ScoreView::measurePopup(QContextMenuEvent* ev, Measure* obj)
       else if (cmd == "props") {
             MeasureProperties im(obj);
             im.exec();
+            }
+      else if (cmd == "delete-selected-measures") {
+            _score->cmdTimeDelete();
             }
       if (_score->undoStack()->active())
             _score->endCmd();
@@ -1067,6 +1073,7 @@ void ScoreView::paint(const QRect& r, QPainter& p)
       QRectF fr = imatrix.mapRect(QRectF(r));
 
       Element* editElement = 0;
+      Element* lassoToDraw = 0;
       if (editData.element) {
             switch (state) {
                   case ViewState::NORMAL:
@@ -1084,7 +1091,11 @@ void ScoreView::paint(const QRect& r, QPainter& p)
                   case ViewState::FOTO_DRAG_EDIT:
                   case ViewState::FOTO_DRAG_OBJECT:
                   case ViewState::FOTO_LASSO:
-                        editData.element->drawEditMode(&p, editData);
+                        if (editData.element->_name() == "Lasso") // There is no isLasso() method
+                              lassoToDraw = editData.element;
+                        else
+                              editData.element->drawEditMode(&p, editData);
+
                         if (editData.element->isHarmony())
                               editElement = editData.element;     // do not call paint() method
                         break;
@@ -1121,8 +1132,8 @@ void ScoreView::paint(const QRect& r, QPainter& p)
                                     QPointF pt(system->ipos());
                                     qreal h = system->minBottom() + system->minTop();
                                     p.translate(pt);
-                                    QRectF r(0.0, -system->minTop(), system->width(), h);
-                                    p.drawRect(r);
+                                    QRectF rect(0.0, -system->minTop(), system->width(), h);
+                                    p.drawRect(rect);
                                     p.translate(-pt);
                                     }
                               }
@@ -1298,6 +1309,11 @@ void ScoreView::paint(const QRect& r, QPainter& p)
             //
             p.drawLine(QLineF(x2, y1, x2, y2).translated(system2->page()->pos()));
             }
+
+      // Draw foto lasso to ensure that it is above everything else
+      if (lassoToDraw)
+            lassoToDraw->drawEditMode(&p, editData);
+
       p.setMatrixEnabled(false);
       if (_score->layoutMode() != LayoutMode::LINE && _score->layoutMode() != LayoutMode::SYSTEM && !r1.isEmpty()) {
             p.setClipRegion(r1);  // only background
@@ -1561,8 +1577,10 @@ void ScoreView::editCopy()
 
 void ScoreView::editCut()
       {
+      _score->startCmd();
       if (editData.element)
             editData.element->editCut(editData);
+      _score->endCmd();
       }
 
 //---------------------------------------------------------
@@ -1638,8 +1656,8 @@ void ScoreView::editPaste()
       if (editData.element) {
             if (editData.element->isLyrics())
                   toLyrics(editData.element)->paste(editData);
-            else if (editData.element->isText())
-                  toText(editData.element)->paste(editData);
+            else if (editData.element->isTextBase())
+                  toTextBase(editData.element)->paste(editData);
             }
       }
 
@@ -2064,6 +2082,10 @@ void ScoreView::cmd(const char* s)
             }
       else if (cmd == "tie") {
             _score->cmdAddTie();
+            moveCursor();
+            }
+      else if (cmd == "chord-tie") {
+            _score->cmdAddTie(true);
             moveCursor();
             }
       else if (cmd == "duplet")
@@ -2559,9 +2581,8 @@ void ScoreView::deselectAll()
 QVariant ScoreView::inputMethodQuery(Qt::InputMethodQuery query) const
       {
 //      qDebug("0x%x  %s", int(query), editData.element ? editData.element->name() : "-no element-");
-      // if editing a text object, place the InputMethod popup window just below the text
-      if (editData.dropElement && editData.dropElement->isTextBase()) {
-            TextBase* text = toTextBase(editData.dropElement);
+      if (editData.element && editData.element->isTextBase()) {
+            TextBase* text = toTextBase(editData.element);
             switch (query) {
                   case Qt::ImCursorRectangle: {
                         QRectF r;
@@ -2573,11 +2594,14 @@ QVariant ScoreView::inputMethodQuery(Qt::InputMethodQuery query) const
                         else
                               r = toPhysical(text->canvasBoundingRect());
                         r.setHeight(r.height() + 10); // add a little margin under the cursor
-                        qDebug("   cursorRect: [%3f,%3f,%3f,%3f]", r.x(), r.y(), r.width(), r.height());
-                        return QVariant(r);
+                        qDebug("ScoreView::inputMethodQuery() updating cursorRect to: (%3f, %3f) + (%3f, %3f)", r.x(), r.y(), r.width(), r.height());
+                        return QVariant(r);     
                         }
                   case Qt::ImEnabled:
-                        return editMode();
+                        return true; // TextBase will always accept input method input
+                  case Qt::ImHints:
+                        return Qt::ImhNone; // No hints for now, but maybe in future will give hints
+                  case Qt::ImInputItemClipRectangle: // maybe give clip rect hint in future, but for now use default parent clipping rect
                   default:
                         return QWidget::inputMethodQuery(query); // fall back to QWidget's version as default
                   }
@@ -3308,8 +3332,7 @@ void ScoreView::cmdAddNoteLine()
 void ScoreView::cmdChangeEnharmonic(bool both)
       {
       _score->startCmd();
-      Selection selection = _score->selection();
-      QList<Note*> notes = selection.uniqueNotes();
+      QList<Note*> notes = _score->selection().uniqueNotes();
       for (Note* n : notes) {
             Staff* staff = n->staff();
             if (staff->part()->instrument()->useDrumset())
@@ -3370,6 +3393,7 @@ void ScoreView::cmdChangeEnharmonic(bool both)
                   }
             }
 
+      Selection& selection = _score->selection();
       selection.clear();
       for (Note* n : notes)
             selection.add(n);

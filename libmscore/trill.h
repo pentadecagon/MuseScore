@@ -29,9 +29,11 @@ class TrillSegment final : public LineSegment {
 
       void symbolLine(SymId start, SymId fill);
       void symbolLine(SymId start, SymId fill, SymId end);
+      virtual Sid getPropertyStyle(Pid) const override;
 
    protected:
    public:
+      TrillSegment(Spanner* sp, Score* s) : LineSegment(sp, s, ElementFlag::MOVABLE | ElementFlag::ON_STAFF)      {}
       TrillSegment(Score* s) : LineSegment(s, ElementFlag::MOVABLE | ElementFlag::ON_STAFF)      {}
       Trill* trill() const                         { return (Trill*)spanner(); }
       virtual ElementType type() const override  { return ElementType::TRILL_SEGMENT; }
@@ -58,13 +60,14 @@ class TrillSegment final : public LineSegment {
 //---------------------------------------------------------
 
 class Trill final : public SLine {
+      virtual Sid getPropertyStyle(Pid) const override;
+
    public:
       enum class Type : char {
             TRILL_LINE, UPPRALL_LINE, DOWNPRALL_LINE, PRALLPRALL_LINE,
             };
 
    private:
-      Q_PROPERTY(Ms::Trill::Type trillType READ trillType WRITE undoSetTrillType)
       Type _trillType;
       Accidental* _accidental;
       MScore::OrnamentStyle _ornamentStyle; // for use in ornaments such as trill
@@ -84,7 +87,6 @@ class Trill final : public SLine {
       virtual void read(XmlReader&) override;
 
       void setTrillType(const QString& s);
-      void undoSetTrillType(Type val);
       void setTrillType(Type tt)          { _trillType = tt; }
       Type trillType() const              { return _trillType; }
       void setOrnamentStyle(MScore::OrnamentStyle val) { _ornamentStyle = val;}

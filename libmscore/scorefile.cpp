@@ -546,7 +546,7 @@ QImage Score::createThumbnail()
 //    file is already opened
 //---------------------------------------------------------
 
-bool Score::saveCompressedFile(QIODevice* f, QFileInfo& info, bool onlySelection, bool doCreateThumbnail)
+bool Score::saveCompressedFile(QFileDevice* f, QFileInfo& info, bool onlySelection, bool doCreateThumbnail)
       {
       MQZipWriter uz(f);
 
@@ -571,6 +571,14 @@ bool Score::saveCompressedFile(QIODevice* f, QFileInfo& info, bool onlySelection
       cbuf.seek(0);
       //uz.addDirectory("META-INF");
       uz.addFile("META-INF/container.xml", cbuf.data());
+
+      QBuffer dbuf;
+      dbuf.open(QIODevice::ReadWrite);
+      saveFile(&dbuf, true, onlySelection);
+      dbuf.seek(0);
+      uz.addFile(fn, dbuf.data());
+      f->flush(); // flush to preserve score data in case of
+                  // any failures on the further operations.
 
       // save images
       //uz.addDirectory("Pictures");
@@ -620,11 +628,6 @@ bool Score::saveCompressedFile(QIODevice* f, QFileInfo& info, bool onlySelection
       if (_audio)
             uz.addFile("audio.ogg", _audio->data());
 
-      QBuffer dbuf;
-      dbuf.open(QIODevice::ReadWrite);
-      saveFile(&dbuf, true, onlySelection);
-      dbuf.seek(0);
-      uz.addFile(fn, dbuf.data());
       uz.close();
       return true;
       }
@@ -813,6 +816,8 @@ Score::FileError MasterScore::loadCompressedMsc(QIODevice* io, bool ignoreVersio
                   }
             }
       XmlReader e(dbuf);
+      QBuffer readAheadBuf(&dbuf);
+      e.setReadAheadDevice(&readAheadBuf);
       e.setDocName(masterScore()->fileInfo()->completeBaseName());
 
       FileError retval = read1(e, ignoreVersionError);
@@ -870,6 +875,7 @@ Score::FileError MasterScore::loadMsc(QString name, QIODevice* io, bool ignoreVe
             return loadCompressedMsc(io, ignoreVersionError);
       else {
             XmlReader r(io);
+            r.setReadAheadDevice(io);
             return read1(r, ignoreVersionError);
             }
       }
@@ -1076,9 +1082,10 @@ qDebug("createRevision");
 //    Returns true if <voice> tag was written.
 //---------------------------------------------------------
 
-static bool writeVoiceMove(XmlWriter& xml, Segment* seg, int startTick, int track, int lastTrackWritten)
+static bool writeVoiceMove(XmlWriter& xml, Segment* seg, int startTick, int track, int* lastTrackWrittenPtr)
       {
       bool voiceTagWritten = false;
+      int& lastTrackWritten = *lastTrackWrittenPtr;
       if ((lastTrackWritten < track) && !xml.clipboardmode()) {
             while (lastTrackWritten < (track - 1)) {
                   xml.tagE("voice");
@@ -1087,6 +1094,7 @@ static bool writeVoiceMove(XmlWriter& xml, Segment* seg, int startTick, int trac
             xml.stag("voice");
             xml.setCurTick(startTick);
             xml.setCurTrack(track);
+            ++lastTrackWritten;
             voiceTagWritten = true;
             }
 
@@ -1197,7 +1205,7 @@ void Score::writeSegments(XmlWriter& xml, int strack, int etrack,
                         if (e1->track() != track || e1->generated() || (e1->systemFlag() && !writeSystemElements))
                               continue;
                         if (needMove) {
-                              voiceTagWritten |= writeVoiceMove(xml, segment, startTick, track, lastTrackWritten);
+                              voiceTagWritten |= writeVoiceMove(xml, segment, startTick, track, &lastTrackWritten);
                               needMove = false;
                               }
                         e1->write(xml);
@@ -1215,7 +1223,7 @@ void Score::writeSegments(XmlWriter& xml, int strack, int etrack,
                                           end = s->tick2() <= endTick;
                                     if (s->tick() == segment->tick() && (!clip || end) && !s->isSlur()) {
                                           if (needMove) {
-                                                voiceTagWritten |= writeVoiceMove(xml, segment, startTick, track, lastTrackWritten);
+                                                voiceTagWritten |= writeVoiceMove(xml, segment, startTick, track, &lastTrackWritten);
                                                 needMove = false;
                                                 }
                                           s->writeSpannerStart(xml, segment, track);
@@ -1227,7 +1235,7 @@ void Score::writeSegments(XmlWriter& xml, int strack, int etrack,
                                  && (!clip || s->tick() >= fs->tick())
                                  ) {
                                     if (needMove) {
-                                          voiceTagWritten |= writeVoiceMove(xml, segment, startTick, track, lastTrackWritten);
+                                          voiceTagWritten |= writeVoiceMove(xml, segment, startTick, track, &lastTrackWritten);
                                           needMove = false;
                                           }
                                     s->writeSpannerEnd(xml, segment, track);
@@ -1258,7 +1266,7 @@ void Score::writeSegments(XmlWriter& xml, int strack, int etrack,
                         timeSigWritten = true;
                         }
                   if (needMove) {
-                        voiceTagWritten |= writeVoiceMove(xml, segment, startTick, track, lastTrackWritten);
+                        voiceTagWritten |= writeVoiceMove(xml, segment, startTick, track, &lastTrackWritten);
                         needMove = false;
                         }
                   if (e->isChordRest()) {
@@ -1286,9 +1294,6 @@ void Score::writeSegments(XmlWriter& xml, int strack, int etrack,
                         if (segment->segmentType() == SegmentType::ChordRest)
                               crWritten = true;
                         }
-
-                  if (voiceTagWritten)
-                        lastTrackWritten = track;
                   }
 
             //write spanner ending after the last segment, on the last tick

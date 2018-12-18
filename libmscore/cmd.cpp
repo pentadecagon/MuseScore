@@ -132,13 +132,11 @@ void Score::startCmd()
 
       // Start collecting low-level undo operations for a
       // user-visible undo action.
-
       if (undoStack()->active()) {
             qDebug("Score::startCmd(): cmd already active");
             return;
             }
-      undoStack()->beginMacro();
-      undo(new SaveState(this));
+      undoStack()->beginMacro(this);
       }
 
 //---------------------------------------------------------
@@ -181,7 +179,7 @@ void Score::endCmd(bool rollback)
 
       if (MScore::debugMode)
             qDebug("===endCmd() %d", undoStack()->current()->childCount());
-      bool noUndo = undoStack()->current()->childCount() <= 1;       // nothing to undo?
+      const bool noUndo = undoStack()->current()->empty();       // nothing to undo?
       undoStack()->endMacro(noUndo);
 
       if (dirty()) {
@@ -329,6 +327,8 @@ void Score::cmdAddSpanner(Spanner* spanner, int staffIdx, Segment* startSegment,
       int track = staffIdx * VOICES;
       spanner->setTrack(track);
       spanner->setTrack2(track);
+      for (auto ss : spanner->spannerSegments())
+            ss->setTrack(track);
       spanner->setTick(startSegment->tick());
       int tick2;
       if (!endSegment)
@@ -1907,6 +1907,8 @@ void Score::cmdResetNoteAndRestGroupings()
 
 static void resetElementPosition(void*, Element* e)
       {
+      if (e->generated())
+            return;
       e->undoResetProperty(Pid::AUTOPLACE);
       e->undoResetProperty(Pid::OFFSET);
       if (e->isSpanner())
@@ -2479,16 +2481,14 @@ void Score::cmdExplode()
                   lastStaff = qMin(nstaves(), srcStaff + n);
                   }
 
-            // make our own copy of selection, since pasting modifies actual selection
-            Selection srcSelection(selection());
-
+            const QByteArray mimeData(selection().mimeData());
             // copy to all destination staves
             Segment* firstCRSegment = startMeasure->tick2segment(startMeasure->tick());
             for (int i = 1; srcStaff + i < lastStaff; ++i) {
                   int track = (srcStaff + i) * VOICES;
                   ChordRest* cr = toChordRest(firstCRSegment->element(track));
                   if (cr) {
-                        XmlReader e(srcSelection.mimeData());
+                        XmlReader e(mimeData);
                         e.setPasteMode(true);
                         pasteStaff(e, cr->segment(), cr->staffIdx());
                         }
@@ -2654,12 +2654,14 @@ void Score::cmdImplode()
                                     undoRemoveElement(src);
                               }
                         }
+                  // TODO - use first voice that actually has a note and implode remaining voices on it?
+                  // see https://musescore.org/en/node/174111
                   else if (dst) {
                         // destination track has something, but it isn't a chord
-                        // remove everything from other voices if in "voice mode"
+                        // remove rests from other voices if in "voice mode"
                         for (int i = 1; i < VOICES; ++i) {
                               Element* e = s->element(dstTrack + i);
-                              if (e)
+                              if (e && e->isRest())
                                     undoRemoveElement(e);
                               }
                         }
@@ -2675,23 +2677,19 @@ void Score::cmdImplode()
                   lTick = endSegment->tick();
             else
                   lTick = lastMeasure()->endTick();
-            for (Segment* seg = startSegment; seg && seg->tick() < lTick; seg = seg->next1()) {
-                  for (int i = startTrack; i < endTrack && full != VOICES; i++) {
-                        bool t = true;
-                        for (int j = 0; j < VOICES; j++) {
-                              if (i == tracks[j]) {
-                                    t = false;
-                                    break;
-                                    }
-                              }
 
-                        if (!seg->measure()->hasVoice(i) || seg->measure()->isOnlyRests(i) || !t)
-                              continue;
-                        tracks[full] = i;
-                        full++;
+            // identify tracks to combine, storing the source track numbers in tracks[]
+            // first four non-empty tracks to win
+            for (int track = startTrack; track < endTrack && full < VOICES; ++track) {
+                  for (Measure* m = startMeasure; m && m != endMeasure; m = m->nextMeasure()) {
+                        if (m->hasVoice(track) && !m->isOnlyRests(track)) {
+                              tracks[full++] = track;
+                              break;
+                              }
                         }
                   }
 
+            // clone source tracks into destination
             for (int i = dstTrack; i < dstTrack + VOICES; i++) {
                   int strack = tracks[i % VOICES];
                   if (strack != -1 && strack != i) {

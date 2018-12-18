@@ -705,8 +705,13 @@ const ChordDescription* Harmony::parseHarmony(const QString& ss, int* root, int*
 
 void Harmony::startEdit(EditData& ed)
       {
-      if (!textList.empty())
+      if (!textList.empty()) {
             setXmlText(harmonyName());
+            // force layout, but restore original position
+            QPointF p = ipos();
+            layout();
+            setPos(p);
+            }
 
       TextBase::startEdit(ed);
       }
@@ -721,12 +726,17 @@ bool Harmony::edit(EditData& ed)
             return true; // Harmony only single line
       bool rv = TextBase::edit(ed);
       setHarmony(plainText());
+
+      // force layout, but restore original position
+      QPointF p = ipos();
+      layout();
+      setPos(p);
+
       int root, base;
       QString str = xmlText();
-      bool badSpell = !str.isEmpty() && !parseHarmony(str, &root, &base, true);
-      setProperty(Pid::COLOR, badSpell ? QColor(Qt::red) : QColor(Qt::black));
+      showSpell = !str.isEmpty() && !parseHarmony(str, &root, &base, true);
 
-      if (badSpell)
+      if (showSpell)
             qDebug("bad spell");
       return rv;
       }
@@ -737,6 +747,7 @@ bool Harmony::edit(EditData& ed)
 
 void Harmony::endEdit(EditData& ed)
       {
+      showSpell = false;
       TextBase::endEdit(ed);
 
       if (links()) {
@@ -1035,7 +1046,7 @@ void Harmony::layout()
             xx += cw;
             xx -= width();
             }
-      else if (align() & Align::HCENTER) {
+      else if ((align() & Align::HCENTER) || parent()->isFretDiagram()) {
             xx += (cw * .5);
             xx -= (width() * .5);
             }
@@ -1123,10 +1134,19 @@ void Harmony::drawEditMode(QPainter* p, EditData& ed)
       {
       TextBase::drawEditMode(p, ed);
 
-      QPointF pos(pagePos());
+      QColor originalColor = color();
+      if (showSpell) {
+            setColor(QColor(Qt::red));
+            setSelected(false);
+            }
+      QPointF pos(canvasPos());
       p->translate(pos);
       TextBase::draw(p);
       p->translate(-pos);
+      if (showSpell) {
+            setColor(originalColor);
+            setSelected(true);
+            }
       }
 
 //---------------------------------------------------------
@@ -1609,6 +1629,8 @@ QVariant Harmony::getProperty(Pid pid) const
 bool Harmony::setProperty(Pid pid, const QVariant& v)
       {
       if (TextBase::setProperty(pid, v)) {
+            if (pid == Pid::TEXT)
+                  setHarmony(v.toString());
             render();
             return true;
             }

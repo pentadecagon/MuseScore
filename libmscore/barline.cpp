@@ -43,13 +43,19 @@ static void undoChangeBarLineType(BarLine* bl, BarLineType barType)
             case BarLineType::BROKEN:
             case BarLineType::DOTTED: {
                   Segment* segment        = bl->segment();
+                  for (ScoreElement* el : bl->linkList()) {
+                        if (el->score()->isMaster() && el->isBarLine())
+                              segment = toBarLine(el)->segment();
+                        }
                   SegmentType segmentType = segment->segmentType();
                   if (segmentType == SegmentType::EndBarLine) {
                         m->undoChangeProperty(Pid::REPEAT_END, false);
                         for (Element* e : segment->elist()) {
                               if (e) {
-                                    e->score()->undo(new ChangeProperty(e, Pid::BARLINE_TYPE, QVariant::fromValue(barType), PropertyFlags::NOSTYLE));
-                                    e->score()->undo(new ChangeProperty(e, Pid::GENERATED, false, PropertyFlags::NOSTYLE));
+                                    for (ScoreElement* ee : e->linkList()) {
+                                          ee->score()->undo(new ChangeProperty(ee, Pid::BARLINE_TYPE, QVariant::fromValue(barType), PropertyFlags::NOSTYLE));
+                                          ee->score()->undo(new ChangeProperty(ee, Pid::GENERATED, false, PropertyFlags::NOSTYLE));
+                                          }
                                     }
                               }
                         }
@@ -378,7 +384,11 @@ bool BarLine::isTop() const
 
 bool BarLine::isBottom() const
       {
-      return !_spanStaff;      // TODO
+      int nstaves = score()->nstaves();
+      if (!_spanStaff || staffIdx() == nstaves - 1)
+            return true;
+      // TODO: check if spanned-to staves are visible on this system
+      return false;
       }
 
 //---------------------------------------------------------

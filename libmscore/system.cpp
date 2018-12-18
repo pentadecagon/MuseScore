@@ -71,8 +71,10 @@ System::System(Score* s)
 
 System::~System()
       {
-      for (SpannerSegment* ss : spannerSegments())
-            ss->setParent(0);
+      for (SpannerSegment* ss : spannerSegments()) {
+            if (ss->system() == this)
+                  ss->setParent(nullptr);
+            }
       for (MeasureBase* mb : measures()) {
             if (mb->system() == this)
                   mb->setSystem(nullptr);
@@ -232,9 +234,9 @@ void System::layoutSystem(qreal xo1)
                                     b->setTrack(track);
                                     }
                               add(b);
-                              if (bi->selected() != b->selected()) {
-                                    bi->selected() ? score()->select(b) : score()->deselect(b);
-                                    }
+//                              if (bi->selected() != b->selected()) {
+//                                    bi->selected() ? score()->select(b) : score()->deselect(b);
+//                                    }
                               b->setStaffSpan(firstStaff, lastStaff);
                               bracketWidth[i] = qMax(bracketWidth[i], b->width());
                               }
@@ -595,7 +597,7 @@ void System::layout2()
 //   setInstrumentNames
 //---------------------------------------------------------
 
-void System::setInstrumentNames(bool longName)
+void System::setInstrumentNames(bool longName, int tick)
       {
       //
       // remark: add/remove instrument names is not undo/redoable
@@ -612,10 +614,6 @@ void System::setInstrumentNames(bool longName)
             return;
             }
 
-      // TODO: ml is normally empty here, so we are unable to retrieve tick
-      // thus, staff name does not reflect current instrument
-
-      int tick = ml.empty() ? 0 : ml.front()->tick();
       int staffIdx = 0;
       for (SysStaff* staff : _staves) {
             Staff* s = score()->staff(staffIdx);
@@ -1109,7 +1107,7 @@ qreal System::minDistance(System* s2) const
                         }
                   }
             qreal sld = staff(lastStaff)->skyline().minDistance(s2->staff(firstStaff)->skyline());
-            sld -=  staff(lastStaff)->bbox().height() + minVerticalDistance;
+            sld -=  staff(lastStaff)->bbox().height() - minVerticalDistance;
             dist = qMax(dist, sld);
 //            dist = dist - staff(lastStaff)->bbox().height() + minVerticalDistance;
             }

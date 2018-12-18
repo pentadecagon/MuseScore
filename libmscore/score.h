@@ -387,6 +387,7 @@ class Score : public QObject, public ScoreElement {
             };
 
    private:
+      static std::set<Score*> validScores;
       int _linkId { 0 };
       MasterScore* _masterScore { 0 };
       QList<MuseScoreView*> viewer;
@@ -560,6 +561,8 @@ class Score : public QObject, public ScoreElement {
       virtual bool isMaster() const  { return false;        }
       virtual bool readOnly() const;
 
+      static void onElementDestruction(Element* se);
+
       virtual inline QList<Excerpt*>& excerpts();
       virtual inline const QList<Excerpt*>& excerpts() const;
 
@@ -580,10 +583,11 @@ class Score : public QObject, public ScoreElement {
       void setExcerpt(Excerpt* e)   { _excerpt = e;     }
 
       System* collectSystem(LayoutContext&);
+      void layoutSystemElements(System* system, LayoutContext& lc);
       void getNextMeasure(LayoutContext&);      // get next measure for layout
 
       void cmdRemovePart(Part*);
-      void cmdAddTie();
+      void cmdAddTie(bool addToChord = false);
       void cmdAddOttava(OttavaType);
       void cmdAddStretch(qreal);
       void cmdResetNoteAndRestGroupings();
@@ -758,7 +762,7 @@ class Score : public QObject, public ScoreElement {
       bool saveFile(QFileInfo& info);
       bool saveFile(QIODevice* f, bool msczFormat, bool onlySelection = false);
       bool saveCompressedFile(QFileInfo&, bool onlySelection);
-      bool saveCompressedFile(QIODevice*, QFileInfo&, bool onlySelection, bool createThumbnail = true);
+      bool saveCompressedFile(QFileDevice*, QFileInfo&, bool onlySelection, bool createThumbnail = true);
       bool exportFile();
 
       void print(QPainter* printer, int page);
@@ -840,6 +844,7 @@ class Score : public QObject, public ScoreElement {
       int      styleI(Sid idx) const  { Q_ASSERT(!strcmp(MStyle::valueType(idx),"int"));         return style().value(idx).toInt();  }
 
       void setStyleValue(Sid sid, QVariant value) { style().set(sid, value);     }
+      QString getTextStyleUserName(Tid tid);
       qreal spatium() const                    { return styleD(Sid::spatium);    }
       void setSpatium(qreal v)                 { setStyleValue(Sid::spatium, v); }
 
@@ -1086,6 +1091,7 @@ class Score : public QObject, public ScoreElement {
       bool isSpannerStartEnd(int tick, int track) const;
       void removeSpanner(Spanner*);
       void addSpanner(Spanner*);
+      bool alreadyInList(Spanner*) const;
       void cmdAddSpanner(Spanner* spanner, const QPointF& pos);
       void cmdAddSpanner(Spanner* spanner, int staffIdx, Segment* startSegment, Segment* endSegment);
       void checkSpanner(int startTick, int lastTick);

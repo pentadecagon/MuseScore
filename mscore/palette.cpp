@@ -234,6 +234,8 @@ void Palette::contextMenuEvent(QContextMenuEvent* event)
       int i = idx(event->pos());
       if (i == -1) {
             // palette context menu
+            if (!_moreElements)
+                  return;
             QMenu menu;
             QAction* moreAction = menu.addAction(tr("More Elements..."));
             moreAction->setEnabled(_moreElements);
@@ -244,19 +246,22 @@ void Palette::contextMenuEvent(QContextMenuEvent* event)
             }
 
       QMenu menu;
-      QAction* clearAction   = menu.addAction(tr("Clear"));
+      QAction* deleteCellAction   = menu.addAction(tr("Delete"));
       QAction* contextAction = menu.addAction(tr("Properties..."));
-      clearAction->setEnabled(!_readOnly);
+      deleteCellAction->setEnabled(!_readOnly);
       contextAction->setEnabled(!_readOnly);
       QAction* moreAction    = menu.addAction(tr("More Elements..."));
       moreAction->setEnabled(_moreElements);
 
-      if (cellAt(i) && cellAt(i)->readOnly)
-            clearAction->setEnabled(false);
+      if (filterActive || (cellAt(i) && cellAt(i)->readOnly))
+            deleteCellAction->setEnabled(false);
 
-      QAction* action = menu.exec(mapToGlobal(event->pos()));
+      if (!deleteCellAction->isEnabled() && !contextAction->isEnabled() && !moreAction->isEnabled())
+            return;
 
-      if (action == clearAction) {
+      const QAction* action = menu.exec(mapToGlobal(event->pos()));
+
+      if (action == deleteCellAction) {
             PaletteCell* cell = cellAt(i);
             if (cell) {
                   int ret = QMessageBox::warning(this, QWidget::tr("Delete palette cell"),
@@ -269,7 +274,7 @@ void Palette::contextMenuEvent(QContextMenuEvent* event)
                         _moreElements = false;
                   delete cell;
                   }
-            cells[i] = 0;
+            cells[i] = nullptr;
             emit changed();
             }
       else if (action == contextAction) {
@@ -284,9 +289,11 @@ void Palette::contextMenuEvent(QContextMenuEvent* event)
             emit displayMore(_name);
 
       bool sizeChanged = false;
-      while (!cells.isEmpty() && cells.back() == 0) {
-            cells.removeLast();
-            sizeChanged = true;
+      for (int i = 0; i < cells.size(); ++i) {
+            if (!cellAt(i)) {
+                  cells.removeAt(i);
+                  sizeChanged = true;
+                  }
             }
       if (sizeChanged) {
             setFixedHeight(heightForWidth(width()));
@@ -451,7 +458,7 @@ void Palette::applyPaletteElement(PaletteCell* cell, Qt::KeyboardModifiers modif
       Score* score = mscore->currentScore();
       if (score == 0)
             return;
-      Selection sel = score->selection();       // make a copy of the list
+      const Selection sel = score->selection(); // make a copy of selection state before applying the operation.
       if (sel.isNone())
             return;
 
@@ -522,6 +529,7 @@ void Palette::applyPaletteElement(PaletteCell* cell, Qt::KeyboardModifiers modif
                   ElementType type = Element::readType(e, &dragOffset, &duration);
                   Spanner* spanner = static_cast<Spanner*>(Element::create(type, score));
                   spanner->read(e);
+                  spanner->styleChanged();
                   score->cmdAddSpanner(spanner, idx, startSegment, endSegment);
                   }
             else {
@@ -753,8 +761,7 @@ void Palette::mouseDoubleClickEvent(QMouseEvent* ev)
       Score* score = mscore->currentScore();
       if (score == 0)
             return;
-      Selection sel = score->selection();       // make a copy of the list
-      if (sel.isNone())
+      if (score->selection().isNone())
             return;
 
       applyPaletteElement(cellAt(i), ev->modifiers());
@@ -1513,6 +1520,7 @@ void Palette::read(XmlReader& e)
                                     }
                               else {
                                     cell->element->read(e);
+                                    cell->element->styleChanged();
                                     if (cell->element->type() == ElementType::ICON) {
                                           Icon* icon = static_cast<Icon*>(cell->element);
                                           QAction* ac = getAction(icon->action());

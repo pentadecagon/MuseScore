@@ -286,6 +286,7 @@ bool Beam::twoBeamedNotes()
 //---------------------------------------------------------
 //   layout1
 //    - remove beam segments
+//    - detach from system
 //    - calculate stem direction and set chord
 //---------------------------------------------------------
 
@@ -294,6 +295,8 @@ void Beam::layout1()
       //delete old segments
       qDeleteAll(beamSegments);
       beamSegments.clear();
+
+      setParent(nullptr); // parent is System
 
       maxDuration.setType(TDuration::DurationType::V_INVALID);
       Chord* c1 = 0;
@@ -410,13 +413,11 @@ void Beam::layout1()
             // otherwise, assume beam direction is stem direction
 
             for (ChordRest* cr : _elements) {
-                  if (!cr->isChord())
-                        continue;
-                  Chord* chord = toChord(cr);
-                  if (!(_cross || chord->staffMove())) {
-                        if (chord->up() != _up) {
-                              chord->setUp(_up);
-                              chord->layoutStem1();
+                  const bool staffMove = cr->isChord() ? toChord(cr)->staffMove() : false;
+                  if (!(_cross || staffMove)) {
+                        if (cr->up() != _up) {
+                              cr->setUp(_up);
+                              cr->layoutStem1();
                               }
                         }
                   }

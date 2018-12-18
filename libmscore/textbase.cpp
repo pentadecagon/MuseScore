@@ -1546,7 +1546,7 @@ class XmlNesting : public QStack<QString> {
 //   genText
 //---------------------------------------------------------
 
-void TextBase::genText()
+void TextBase::genText() const
       {
       _text.clear();
       bool bold_      = false;
@@ -1933,6 +1933,11 @@ QString TextBase::plainText() const
 
 QString TextBase::xmlText() const
       {
+#if 1
+      // this is way too expensive
+      // what side effects has genText() ?
+      // this method is const by design
+
       const TextBase* text = this;
       std::unique_ptr<TextBase> tmpText;
       if (textInvalid) {
@@ -1943,6 +1948,11 @@ QString TextBase::xmlText() const
             text = tmpText.get();
             }
       return text->_text;
+#else
+      if (textInvalid)
+            genText();
+      return _text;
+#endif
       }
 
 //---------------------------------------------------------
@@ -2094,7 +2104,7 @@ QString TextBase::accessibleInfo() const
             case Tid::POET:
             case Tid::TRANSLATOR:
             case Tid::MEASURE_NUMBER:
-                  rez = textStyleUserName(tid());
+                  rez = score() ? score()->getTextStyleUserName(tid()) : textStyleUserName(tid());
                   break;
             default:
                   rez = Element::accessibleInfo();
@@ -2123,7 +2133,7 @@ QString TextBase::screenReaderInfo() const
             case Tid::POET:
             case Tid::TRANSLATOR:
             case Tid::MEASURE_NUMBER:
-                  rez = textStyleUserName(tid());
+                  rez = score() ? score()->getTextStyleUserName(tid()) : textStyleUserName(tid());
                   break;
             default:
                   rez = Element::accessibleInfo();
@@ -2139,7 +2149,7 @@ QString TextBase::screenReaderInfo() const
 
 int TextBase::subtype() const
       {
-      return int(Tid());
+      return int(tid());
       }
 
 //---------------------------------------------------------
@@ -2148,14 +2158,14 @@ int TextBase::subtype() const
 
 QString TextBase::subtypeName() const
       {
-      return textStyleUserName(tid());
+      return score() ? score()->getTextStyleUserName(tid()) : textStyleUserName(tid());
       }
 
 //---------------------------------------------------------
 //   fragmentList
 //---------------------------------------------------------
 
-/**
+/*
  Return the text as a single list of TextFragment
  Used by the MusicXML formatted export to avoid parsing the xml text format
  */
@@ -2553,7 +2563,9 @@ void TextBase::draw(QPainter* p) const
       if (hasFrame()) {
             if (frameWidth().val() != 0.0) {
                   QColor fColor = curColor(visible(), frameColor());
-                  QPen pen(fColor, frameWidth().val() * spatium(), Qt::SolidLine,
+                  qreal frameWidthVal = frameWidth().val() * (sizeIsSpatiumDependent() ? spatium() : 1);
+
+                  QPen pen(fColor, frameWidthVal, Qt::SolidLine,
                      Qt::SquareCap, Qt::MiterJoin);
                   p->setPen(pen);
                   }
@@ -2564,10 +2576,13 @@ void TextBase::draw(QPainter* p) const
             if (circle())
                   p->drawEllipse(frame);
             else {
-                  int r2 = frameRound();
+                  qreal baseSpatium = MScore::baseStyle().value(Sid::spatium).toDouble();
+                  qreal frameRoundFactor = (sizeIsSpatiumDependent() ? (spatium()/baseSpatium) / 2 : 0.5f);
+
+                  int r2 = frameRound() * frameRoundFactor;
                   if (r2 > 99)
                         r2 = 99;
-                  p->drawRoundedRect(frame, frameRound(), r2);
+                  p->drawRoundedRect(frame, frameRound() * frameRoundFactor, r2);
                   }
             }
       p->setBrush(Qt::NoBrush);
@@ -2689,7 +2704,7 @@ bool TextBase::hasCustomFormatting() const
 
 QString TextBase::stripText(bool removeStyle, bool removeSize, bool removeFace) const
       {
-      QString _text;
+      QString _txt;
       bool bold_      = false;
       bool italic_    = false;
       bool underline_ = false;
@@ -2711,7 +2726,7 @@ QString TextBase::stripText(bool removeStyle, bool removeSize, bool removeFace) 
       fmt.setPreedit(false);
       fmt.setValign(VerticalAlignment::AlignNormal);
 
-      XmlNesting xmlNesting(&_text);
+      XmlNesting xmlNesting(&_txt);
       if (!removeStyle) {
             if (bold_)
                   xmlNesting.pushB();
@@ -2748,9 +2763,9 @@ QString TextBase::stripText(bool removeStyle, bool removeSize, bool removeFace) 
                         }
 
                   if (!removeSize && (format.fontSize() != fmt.fontSize()))
-                        _text += QString("<font size=\"%1\"/>").arg(format.fontSize());
+                        _txt += QString("<font size=\"%1\"/>").arg(format.fontSize());
                   if (!removeFace && (format.fontFamily() != fmt.fontFamily()))
-                        _text += QString("<font face=\"%1\"/>").arg(TextBase::escape(format.fontFamily()));
+                        _txt += QString("<font face=\"%1\"/>").arg(TextBase::escape(format.fontFamily()));
 
                   VerticalAlignment va = format.valign();
                   VerticalAlignment cva = fmt.valign();
@@ -2767,15 +2782,15 @@ QString TextBase::stripText(bool removeStyle, bool removeSize, bool removeFace) 
                                     break;
                               }
                         }
-                  _text += XmlWriter::xmlString(f.text);
+                  _txt += XmlWriter::xmlString(f.text);
                   fmt = format;
                   }
             if (block.eol())
-                  _text += QChar::LineFeed;
+                  _txt += QChar::LineFeed;
             }
       while (!xmlNesting.empty())
             xmlNesting.popToken();
-      return _text;
+      return _txt;
       }
 
 //---------------------------------------------------------

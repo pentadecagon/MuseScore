@@ -13,6 +13,7 @@
 #include "inspector.h"
 #include "inspectorTextBase.h"
 #include "libmscore/text.h"
+#include "libmscore/score.h"
 #include "icons.h"
 
 namespace Ms {
@@ -25,10 +26,12 @@ InspectorTextBase::InspectorTextBase(QWidget* parent)
    : InspectorElementBase(parent)
       {
       t.setupUi(addWidget());
+      style = nullptr;
 
       const std::vector<InspectorItem> iiList = {
             { Pid::FONT_FACE,         0, t.fontFace,     t.resetFontFace     },
             { Pid::FONT_SIZE,         0, t.fontSize,     t.resetFontSize     },
+            { Pid::SIZE_SPATIUM_DEPENDENT,        0,  t.spatiumDependent,    t.resetSpatiumDependent    },
             { Pid::FONT_STYLE,        0, t.fontStyle,    t.resetFontStyle    },
             { Pid::FRAME_TYPE,        0, t.frameType,    t.resetFrameType    },
             { Pid::FRAME_FG_COLOR,    0, t.frameColor,   t.resetFrameColor   },
@@ -88,6 +91,26 @@ void InspectorTextBase::setElement()
       updateFrame();
       TextBase* text = toTextBase(inspector->element());
       t.resetToStyle->setEnabled(text->hasCustomFormatting());
+      populateStyle(style);
+      }
+
+//---------------------------------------------------------
+//   populateStyle
+//---------------------------------------------------------
+
+void InspectorTextBase::populateStyle(QComboBox* style)
+      {
+      if (style) {
+            this->style = style;
+            Score* score = inspector->element()->score();
+            style->blockSignals(true);
+            int idx = style->currentIndex();
+            style->clear();
+            for (auto ss : primaryTextStyles())
+                  style->addItem(score->getTextStyleUserName(ss), int(ss));
+            style->setCurrentIndex(idx);
+            style->blockSignals(false);
+            }
       }
 
 } // namespace Ms

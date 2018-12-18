@@ -58,7 +58,7 @@ xcode:
     xcodebuild -project ${XCODEPROJ} -target lrelease;
 
 lupdate:
-	cd build.release;xcodebuild -project ${XCODEPROJ} -target lupdate;
+	cd build.release; xcodebuild -project ${XCODEPROJ} -target lupdate;
 
 lrelease:
 	cd build.release;xcodebuild -project ${XCODEPROJ} -target lrelease;

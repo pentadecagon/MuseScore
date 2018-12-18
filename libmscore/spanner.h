@@ -56,6 +56,7 @@ class SpannerSegment : public Element {
       QPointF _offset2;
 
    public:
+      SpannerSegment(Spanner*, Score*, ElementFlags f = ElementFlag::ON_STAFF | ElementFlag::MOVABLE);
       SpannerSegment(Score* s, ElementFlags f = ElementFlag::ON_STAFF | ElementFlag::MOVABLE);
       SpannerSegment(const SpannerSegment&);
       virtual SpannerSegment* clone() const = 0;
@@ -202,7 +203,7 @@ class Spanner : public Element {
       const SpannerSegment* backSegment() const    { return segments.back();  }
       SpannerSegment* segmentAt(int n)             { return segments[n];      }
       const SpannerSegment* segmentAt(int n) const { return segments[n];      }
-      int nsegments() const                        { return segments.size();  }
+      size_t nsegments() const                     { return segments.size();  }
       bool segmentsEmpty() const                   { return segments.empty(); }
       void eraseSpannerSegments();
 

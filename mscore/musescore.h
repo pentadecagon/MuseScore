@@ -305,6 +305,7 @@ class MuseScore : public QMainWindow, public MuseScoreCore {
       QMenu* menuFormat;
       QMenu* menuTools;
       QMenu* menuVoices;
+      QMenu* menuMeasure;
 
       QMenu* menuPlugins;
       QMenu* menuHelp;
@@ -513,7 +514,14 @@ class MuseScore : public QMainWindow, public MuseScoreCore {
       void removeTab(int);
       void removeTab();
       void clipboardChanged();
+      void inputMethodAnchorRectangleChanged();
+      void inputMethodAnimatingChanged();
+      void inputMethodCursorRectangleChanged();
+      void inputMethodInputDirectionChanged(Qt::LayoutDirection newDirection);
+      void inputMethodInputItemClipRectangleChanged();
+      void inputMethodKeyboardRectangleChanged();
       void inputMethodLocaleChanged();
+      void inputMethodVisibleChanged();
       void endSearch();
       void saveScoreDialogFilterSelected(const QString&);
 #ifdef OSC
@@ -715,8 +723,12 @@ class MuseScore : public QMainWindow, public MuseScoreCore {
       bool saveMetadataJSON(Score*, const QString& name);
       QJsonObject saveMetadataJSON(Score*);
 
+      /////The methods are used in the musescore.com backend
       bool exportAllMediaFiles(const QString& inFilePath, const QString& outFilePath = "/dev/stdout");
-
+      bool exportMp3AsJSON(const QString& inFilePath, const QString& outFilePath = "/dev/stdout");
+      bool exportPartsPdfsToJSON(const QString& inFilePath, const QString& outFilePath = "/dev/stdout");
+      /////////////////////////////////////////////////
+      
       virtual void closeScore(Score* score);
 
       void addTempo();

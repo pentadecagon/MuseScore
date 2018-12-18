@@ -79,7 +79,8 @@ static void transposeChord(Chord* c, Interval srcTranspose, int tick)
 
 bool Score::pasteStaff(XmlReader& e, Segment* dst, int dstStaff)
       {
-      Q_ASSERT(dst->segmentType() == SegmentType::ChordRest);
+      Q_ASSERT(dst->isChordRestType());
+
       QList<Chord*> graceNotes;
       Beam* startingBeam = nullptr;
       Tuplet* tuplet = nullptr;
@@ -176,9 +177,7 @@ bool Score::pasteStaff(XmlReader& e, Segment* dst, int dstStaff)
                               Measure* measure = tick2measure(tick);
                               tuplet->setParent(measure);
                               tuplet->setTick(tick);
-                              int ticks = tuplet->actualTicks();
-                              int rticks = measure->endTick() - tick;
-                              if (rticks < ticks) {
+                              if (tuplet->rfrac() + tuplet->duration() > measure->len()) {
                                     delete tuplet;
                                     if (oldTuplet && oldTuplet->elements().empty())
                                           delete oldTuplet;
@@ -414,10 +413,10 @@ bool Score::pasteStaff(XmlReader& e, Segment* dst, int dstStaff)
                   endStaff = nstaves();
             //check and add truly invisible rests insted of gaps
             //TODO: look if this could be done different
-            Measure* dstM = tick2measureMM(dstTick);
-            Measure* endM = tick2measureMM(dstTick + tickLen);
+            Measure* dstM = tick2measure(dstTick);
+            Measure* endM = tick2measure(dstTick + tickLen);
             for (int i = dstStaff; i < endStaff; i++) {
-                  for (Measure* m = dstM; m && m != endM->nextMeasureMM(); m = m->nextMeasureMM())
+                  for (Measure* m = dstM; m && m != endM->nextMeasure(); m = m->nextMeasure())
                         m->checkMeasure(i);
                   }
             _selection.setRangeTicks(dstTick, dstTick + tickLen, dstStaff, endStaff);

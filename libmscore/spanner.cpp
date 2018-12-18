@@ -35,12 +35,19 @@ class SpannerWriter : public ConnectorInfoWriter {
    public:
       SpannerWriter(XmlWriter& xml, const Element* current, const Spanner* spanner, int track, Fraction frac, bool start);
 
-      static void fillSpannerPosition(Location& l, const Element* endpoint, int tick, bool clipboardmode);
+      static void fillSpannerPosition(Location& l, const MeasureBase* endpoint, int tick, bool clipboardmode);
       };
 
 //---------------------------------------------------------
 //   SpannerSegment
 //---------------------------------------------------------
+
+SpannerSegment::SpannerSegment(Spanner* sp, Score* s, ElementFlags f)
+   : Element(s, f)
+      {
+      _spanner = sp;
+      setSpannerSegmentType(SpannerSegmentType::SINGLE);
+      }
 
 SpannerSegment::SpannerSegment(Score* s, ElementFlags f)
    : Element(s, f)
@@ -1050,7 +1057,7 @@ int Spanner::reuseSegments(int number)
 
 void Spanner::fixupSegments(unsigned int targetNumber, std::function<SpannerSegment*()> createSegment)
       {
-      const int diff = targetNumber - segments.size();
+      const int diff = targetNumber - int(nsegments());
       if (diff == 0)
             return;
       if (diff > 0) {
@@ -1194,8 +1201,8 @@ void Spanner::writeSpannerEnd(XmlWriter& xml, const Element* current, int track,
 
 void Spanner::readSpanner(XmlReader& e, Element* current, int track)
       {
-      ConnectorInfoReader info(e, current, track);
-      ConnectorInfoReader::readConnector(info, e);
+      std::unique_ptr<ConnectorInfoReader> info(new ConnectorInfoReader(e, current, track));
+      ConnectorInfoReader::readConnector(std::move(info), e);
       }
 
 //--------------------------------------------------
@@ -1204,38 +1211,26 @@ void Spanner::readSpanner(XmlReader& e, Element* current, int track)
 
 void Spanner::readSpanner(XmlReader& e, Score* current, int track)
       {
-      ConnectorInfoReader info(e, current, track);
-      ConnectorInfoReader::readConnector(info, e);
+      std::unique_ptr<ConnectorInfoReader> info(new ConnectorInfoReader(e, current, track));
+      ConnectorInfoReader::readConnector(std::move(info), e);
       }
 
 //---------------------------------------------------------
 //   SpannerWriter::fillSpannerPosition
 //---------------------------------------------------------
 
-void SpannerWriter::fillSpannerPosition(Location& l, const Element* endpoint, int tick, bool clipboardmode)
+void SpannerWriter::fillSpannerPosition(Location& l, const MeasureBase* m, int tick, bool clipboardmode)
       {
       if (clipboardmode) {
             l.setMeasure(0);
             l.setFrac(Fraction::fromTicks(tick));
             }
       else {
-            const MeasureBase* m = toMeasureBase(endpoint->findMeasure());
             if (!m) {
                   qWarning("fillSpannerPosition: couldn't find spanner's endpoint's measure");
                   l.setMeasure(0);
                   l.setFrac(Fraction::fromTicks(tick));
                   return;
-                  }
-            // It may happen (hairpins!) that the spanner's end element is
-            // situated in the end of one measure but its end tick is in the
-            // beginning of the next measure. So we are to correct the found
-            // measure a bit.
-            while (tick >= m->endTick()) {
-                  const MeasureBase* next = m->next();
-                  if (next)
-                        m = next;
-                  else
-                        break;
                   }
             l.setMeasure(m->measureIndex());
             l.setFrac(Fraction::fromTicks(tick - m->tick()));
@@ -1261,12 +1256,12 @@ SpannerWriter::SpannerWriter(XmlWriter& xml, const Element* current, const Spann
             // elements and will try to obtain this info from the spanner itself.
             if (!start) {
                   _prevLoc.setTrack(sp->track());
-                  fillSpannerPosition(_prevLoc, sp->startElement(), sp->tick(), clipboardmode);
+                  fillSpannerPosition(_prevLoc, sp->score()->tick2measure(sp->tick()), sp->tick(), clipboardmode);
                   }
             else {
                   const int track2 = (sp->track2() != -1) ? sp->track2() : sp->track();
                   _nextLoc.setTrack(track2);
-                  fillSpannerPosition(_nextLoc, sp->endElement(), sp->tick2(), clipboardmode);
+                  fillSpannerPosition(_nextLoc, sp->score()->tick2measure(sp->tick2()), sp->tick2(), clipboardmode);
                   }
             }
       else {
@@ -1292,6 +1287,9 @@ void SpannerSegment::autoplaceSpannerSegment(qreal minDistance)
             }
       if (isStyled(Pid::OFFSET))
             setOffset(spanner()->propertyDefault(Pid::OFFSET).toPointF());
+
+      if (spanner()->anchor() == Spanner::Anchor::NOTE)
+            return;
 
       if (visible() && autoplace()) {
             SkylineLine sl(!spanner()->placeAbove());

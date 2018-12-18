@@ -124,6 +124,7 @@ void Pedal::write(XmlWriter& xml) const
          Pid::END_TEXT,
          Pid::LINE_WIDTH,
          Pid::LINE_STYLE,
+         Pid::LINE_VISIBLE,
          Pid::BEGIN_HOOK_TYPE
          }) {
             writeProperty(xml, i);
@@ -146,7 +147,8 @@ static const ElementStyle pedalSegmentStyle {
 
 LineSegment* Pedal::createLineSegment()
       {
-      PedalSegment* p = new PedalSegment(score());
+      PedalSegment* p = new PedalSegment(this, score());
+      p->setTrack(track());
       p->initElementStyle(&pedalSegmentStyle);
       return p;
       }

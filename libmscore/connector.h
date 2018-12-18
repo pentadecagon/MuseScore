@@ -56,6 +56,11 @@ class ConnectorInfo {
       bool currentUpdated() const         { return _currentUpdated; }
       void setCurrentUpdated(bool v)      { _currentUpdated = v;    }
 
+      ConnectorInfo* findFirst();
+      const ConnectorInfo* findFirst() const;
+      ConnectorInfo* findLast();
+      const ConnectorInfo* findLast() const;
+
    public:
       ConnectorInfo(const Element* current, int track = -1, Fraction frac = -1);
       ConnectorInfo(const Location& currentLocation);
@@ -111,9 +116,7 @@ class ConnectorInfoReader final : public ConnectorInfo {
       void update();
       void addToScore(bool pasteMode);
 
-      static void readConnector(ConnectorInfoReader& info, XmlReader& e);
-
-      bool operator==(const ConnectorInfoReader& other) const;
+      static void readConnector(std::unique_ptr<ConnectorInfoReader> info, XmlReader& e);
       };
 
 //---------------------------------------------------------

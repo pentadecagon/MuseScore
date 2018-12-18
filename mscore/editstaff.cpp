@@ -335,7 +335,7 @@ void EditStaff::apply()
       instrument.setLongName(ln);
 
       bool inv       = invisible->isChecked();
-      ClefTypeList clefType = instrument.clefType(orgStaff->rstaff());
+      ClefTypeList clefType = orgStaff->defaultClefType();
       qreal userDist = spinExtraDistance->value();
       bool ifEmpty   = showIfEmpty->isChecked();
       bool hideSystemBL = hideSystemBarLine->isChecked();
@@ -343,7 +343,12 @@ void EditStaff::apply()
       Staff::HideMode hideEmpty = Staff::HideMode(hideMode->currentIndex());
 
       QString newPartName = partName->text().simplified();
-      if (!(instrument == *part->instrument()) || part->partName() != newPartName) {
+
+      bool instrumentFieldChanged = !(instrument == *part->instrument());
+      if (instrumentFieldChanged)
+            clefType = instrument.clefType(orgStaff->rstaff());
+
+      if (instrumentFieldChanged || part->partName() != newPartName) {
             // instrument has changed
             Interval v1 = instrument.transpose();
             Interval v2 = part->instrument()->transpose();

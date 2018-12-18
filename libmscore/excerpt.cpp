@@ -244,7 +244,7 @@ void Excerpt::createExcerpt(Excerpt* excerpt)
                         endTick = score->lastSegment()->tick();
                   score->transposeKeys(staffIdx, staffIdx+1, 0, endTick, interval, true, flip);
 
-                  for (auto segment = score->firstSegment(SegmentType::ChordRest); segment; segment = segment->next1(SegmentType::ChordRest)) {
+                  for (auto segment = score->firstSegmentMM(SegmentType::ChordRest); segment; segment = segment->next1MM(SegmentType::ChordRest)) {
                         interval = staff->part()->instrument(segment->tick())->transpose();
                         if (interval.isZero())
                               continue;
@@ -257,7 +257,16 @@ void Excerpt::createExcerpt(Excerpt* excerpt)
                               Harmony* h  = toHarmony(e);
                               int rootTpc = Ms::transposeTpc(h->rootTpc(), interval, true);
                               int baseTpc = Ms::transposeTpc(h->baseTpc(), interval, true);
-                              score->undoTransposeHarmony(h, rootTpc, baseTpc);
+                              // mmrests are on by default in part
+                              // if this harmony is attached to an mmrest,
+                              // be sure to transpose harmony in underlying measure as well
+                              for (ScoreElement* se : h->linkList()) {
+                                    Harmony* hh = static_cast<Harmony*>(se);
+                                    // skip links to other staves (including in other scores)
+                                    if (hh->staff() != h->staff())
+                                          continue;
+                                    score->undoTransposeHarmony(hh, rootTpc, baseTpc);
+                                    }
                               }
                         }
                   }
@@ -288,18 +297,16 @@ void MasterScore::deleteExcerpt(Excerpt* excerpt)
 
       // unlink the staves in the excerpt
       for (Staff* st : partScore->staves()) {
-            Staff* staff = nullptr;
-            // find staff in the main score
+            bool hasLinksInMaster = false;
             if (st->links()) {
                   for (auto le : *st->links()) {
-                        Staff* s2 = toStaff(le);
-                        if ((s2->score() == this) && s2->primaryStaff()) {
-                              staff = s2;
+                        if (le->score() == this) {
+                              hasLinksInMaster = true;
                               break;
                               }
                         }
                   }
-            if (staff) {
+            if (hasLinksInMaster) {
                   int staffIdx = st->idx();
                   // unlink the spanners
                   for (auto i = partScore->spanner().begin(); i != partScore->spanner().cend(); ++i) {
@@ -322,7 +329,7 @@ void MasterScore::deleteExcerpt(Excerpt* excerpt)
                               }
                         }
                   // unlink the staff
-                  undo(new Unlink(staff));
+                  undo(new Unlink(st));
                   }
             }
       undo(new RemoveExcerpt(excerpt));

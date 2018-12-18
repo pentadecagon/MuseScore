@@ -98,7 +98,9 @@ void LetRing::write(XmlWriter& xml) const
 
 LineSegment* LetRing::createLineSegment()
       {
-      return new LetRingSegment(score());
+      LetRingSegment* lr = new LetRingSegment(this, score());
+      lr->setTrack(track());
+      return lr;
       }
 
 //---------------------------------------------------------
@@ -158,8 +160,12 @@ Sid LetRing::getPropertyStyle(Pid id) const
             case Pid::BEGIN_FONT_FACE:
                   return Sid::letRingFontFace;
             case Pid::BEGIN_FONT_SIZE:
+            case Pid::CONTINUE_FONT_SIZE:
+            case Pid::END_FONT_SIZE:
                   return Sid::letRingFontSize;
             case Pid::BEGIN_FONT_STYLE:
+            case Pid::CONTINUE_FONT_STYLE:
+            case Pid::END_FONT_STYLE:
                   return Sid::letRingFontStyle;
             case Pid::BEGIN_TEXT_ALIGN:
             case Pid::CONTINUE_TEXT_ALIGN:
@@ -173,7 +179,7 @@ Sid LetRing::getPropertyStyle(Pid id) const
             default:
                   break;
             }
-      return Sid::NOSTYLE;
+      return TextLineBase::getPropertyStyle(id);
       }
 
 

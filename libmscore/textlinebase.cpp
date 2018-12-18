@@ -28,8 +28,8 @@ namespace Ms {
 //   TextLineBaseSegment
 //---------------------------------------------------------
 
-TextLineBaseSegment::TextLineBaseSegment(Score* score, ElementFlags f)
-   : LineSegment(score, f)
+TextLineBaseSegment::TextLineBaseSegment(Spanner* sp, Score* score, ElementFlags f)
+   : LineSegment(sp, score, f)
       {
       _text    = new Text(score);
       _endText = new Text(score);
@@ -88,7 +88,7 @@ void TextLineBaseSegment::draw(QPainter* painter) const
             painter->translate(-_endText->pos());
             }
 
-      if (npoints == 0)
+      if ((npoints == 0) || (score() && (score()->printing() || !score()->showInvisible()) && !tl->lineVisible()))
             return;
 
       // color for line (text color comes from the text properties)
@@ -99,7 +99,7 @@ void TextLineBaseSegment::draw(QPainter* painter) const
       else
             color = tl->lineColor();
 #endif
-      QColor color = curColor(tl->visible(), tl->lineColor());
+      QColor color = curColor(tl->visible() && tl->lineVisible(), tl->lineColor());
 
       qreal textlineLineWidth = tl->lineWidth();
       QPen pen(color, textlineLineWidth, tl->lineStyle());
@@ -232,8 +232,11 @@ void TextLineBaseSegment::layout()
       qreal l = 0.0;
       if (!_text->empty()) {
             qreal textlineTextDistance = _spatium * .5;
-            if (((isSingleType() || isBeginType()) && (tl->beginTextPlace() == PlaceText::LEFT || tl->beginTextPlace() == PlaceText::AUTO)) || ((isMiddleType() || isEndType()) && (tl->continueTextPlace() == PlaceText::LEFT)))
+            if (((isSingleType() || isBeginType())
+               && (tl->beginTextPlace() == PlaceText::LEFT || tl->beginTextPlace() == PlaceText::AUTO))
+               || ((isMiddleType() || isEndType()) && (tl->continueTextPlace() == PlaceText::LEFT))) {
                   l = _text->pos().x() + _text->bbox().width() + textlineTextDistance;
+                  }
             qreal h = _text->height();
             if (textLineBase()->beginTextPlace() == PlaceText::ABOVE)
                   y1 = qMin(y1, -h);

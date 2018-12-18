@@ -903,7 +903,16 @@ Segment* ChordRest::nextSegmentAfterCR(SegmentType types) const
       for (Segment* s = segment()->next1MM(types); s; s = s->next1MM(types)) {
             // chordrest ends at afrac+actualFraction
             // we return the segment at or after the end of the chordrest
-            if (s->afrac() >= afrac() + actualFraction())
+            // Segment::afrac() is based on ticks; use DurationElement::afrac() if possible
+            Element* e = s;
+            if (s->segmentType() == SegmentType::ChordRest)
+                  // Find the first non-NULL element in the segment
+                  for (Element* ee : s->elist())
+                        if (ee) {
+                              e = ee;
+                              break;
+                              }
+            if (e->afrac() >= afrac() + actualFraction())
                   return s;
             }
       return 0;
@@ -1164,10 +1173,13 @@ QString ChordRest::accessibleExtraInfo() const
 Shape ChordRest::shape() const
       {
       Shape shape;
+      {
       qreal x1 = 1000000.0;
       qreal x2 = -1000000.0;
       bool adjustWidth = false;
       for (Lyrics* l : _lyrics) {
+            if (!l || !l->visible() || !l->autoplace())
+                  continue;
             static const qreal margin = spatium() * .5;
             // for horizontal spacing we only need the lyrics width:
             x1 = qMin(x1, l->bbox().x() - margin + l->pos().x());
@@ -1176,18 +1188,34 @@ Shape ChordRest::shape() const
                   x2 += spatium();
             adjustWidth = true;
             }
+      if (adjustWidth)
+            shape.addHorizontalSpacing(Shape::SPACING_LYRICS, x1, x2);
+      }
 
+      {
+      qreal x1 = 1000000.0;
+      qreal x2 = -1000000.0;
+      bool adjustWidth = false;
       for (Element* e : segment()->annotations()) {
+            if (!e || !e->visible() || !e->autoplace())
+                  continue;
             if (e->isHarmony() && e->staffIdx() == staffIdx()) {
-                  e->layout();
-                  qreal hx = e->bbox().x() - e->pos().x();
-                  x1 = qMin(x1, hx);
-                  x2 = qMax(x2, hx + e->bbox().width());
+                  Harmony* h = toHarmony(e);
+                  // this layout is needed just to calculate the correct bbox
+                  // so only do it if necessary, as it will reset position to default
+                  // and there might not be an autoplace after this
+                  // since ChordRest::shape() can be called at several points
+                  if (h->isLayoutInvalid())
+                        h->layout();
+                  const qreal margin = styleP(Sid::minHarmonyDistance) * 0.5;
+                  x1 = qMin(x1, e->bbox().x() - margin + e->pos().x());
+                  x2 = qMax(x2, e->bbox().x() + e->bbox().width() + margin + e->pos().x());
                   adjustWidth = true;
                   }
             }
       if (adjustWidth)
-            shape.add(QRectF(x1, 0.0, x2-x1, 0.0));
+            shape.addHorizontalSpacing(Shape::SPACING_HARMONY, x1, x2);
+      }
 
       return shape;
       }

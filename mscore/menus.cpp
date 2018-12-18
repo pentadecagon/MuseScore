@@ -476,17 +476,17 @@ Palette* MuseScore::newFingeringPalette()
             f->setXmlText(QString(finger[i]));
             sp->append(f, tr("RH Guitar Fingering %1").arg(finger[i]));
             }
-      for (char c : "012345") {
+      finger = "012345T";
+      for (unsigned i = 0; i < strlen(finger); ++i) {
             Fingering* f = new Fingering(gscore, Tid::LH_GUITAR_FINGERING);
-            f->setXmlText(QString(c));
-            sp->append(f, tr("LH Guitar Fingering %1").arg(c));
+            f->setXmlText(QString(finger[i]));
+            sp->append(f, tr("LH Guitar Fingering %1").arg(finger[i]));
             }
-
-      const char* stringnumber = "0123456";
-      for (unsigned i = 0; i < strlen(stringnumber); ++i) {
+      finger = "0123456";
+      for (unsigned i = 0; i < strlen(finger); ++i) {
             Fingering* f = new Fingering(gscore, Tid::STRING_NUMBER);
-            f->setXmlText(QString(stringnumber[i]));
-            sp->append(f, tr("String number %1").arg(stringnumber[i]));
+            f->setXmlText(QString(finger[i]));
+            sp->append(f, tr("String number %1").arg(finger[i]));
             }
 
       static const std::vector<SymId> lute {
@@ -1001,7 +1001,7 @@ Palette* MuseScore::newLinesPalette()
       gabel4->setBeginText("<sym>dynamicMezzo</sym><sym>dynamicForte</sym>");
       gabel4->setBeginTextAlign(Align::VCENTER);
       gabel4->setLen(w);
-      sp->append(gabel4, qApp->translate("lines", "Dynamics + hairpin"));
+      sp->append(gabel4, qApp->translate("lines", "Dynamic + hairpin"));
 
       Volta* volta = new Volta(gscore);
       volta->setVoltaType(Volta::Type::CLOSED);
@@ -1037,7 +1037,7 @@ Palette* MuseScore::newLinesPalette()
       il.clear();
       il.append(2);
       volta->setEndings(il);
-      sp->append(volta, QT_TRANSLATE_NOOP("Palette", "Seconda volta 2"));
+      sp->append(volta, QT_TRANSLATE_NOOP("Palette", "Seconda volta, open"));
 
       Ottava* ottava = new Ottava(gscore);
       ottava->setOttavaType(OttavaType::OTTAVA_8VA);

@@ -74,6 +74,7 @@
 namespace Ms {
 
 MasterScore* gscore;                 ///< system score, used for palettes etc.
+std::set<Score*> Score::validScores;
 
 bool scriptDebug     = false;
 bool noSeq           = false;
@@ -244,6 +245,7 @@ void MeasureBaseList::change(MeasureBase* ob, MeasureBase* nb)
 Score::Score()
    : ScoreElement(this), _is(this), _selection(this), _selectionFilter(this)
       {
+      Score::validScores.insert(this);
       _masterScore = 0;
       Layer l;
       l.name          = "default";
@@ -265,6 +267,7 @@ Score::Score()
 Score::Score(MasterScore* parent)
    : Score{}
       {
+      Score::validScores.insert(this);
       _masterScore = parent;
       if (MScore::defaultStyleForParts())
             _style = *MScore::defaultStyleForParts();
@@ -301,6 +304,7 @@ Score::Score(MasterScore* parent)
 Score::Score(MasterScore* parent, const MStyle& s)
    : Score{parent}
       {
+      Score::validScores.erase(this);
       _style  = s;
       }
 
@@ -313,6 +317,8 @@ Score::~Score()
       foreach(MuseScoreView* v, viewer)
             v->removeScore();
       // deselectAll();
+      qDeleteAll(_systems); // systems are layout-only objects so we delete
+                            // them prior to measures.
       for (MeasureBase* m = _measures.first(); m;) {
             MeasureBase* nm = m->next();
             delete m;
@@ -320,7 +326,6 @@ Score::~Score()
             }
       qDeleteAll(_parts);
       qDeleteAll(_staves);
-      qDeleteAll(_systems);
 //      qDeleteAll(_pages);         // TODO: check
       _masterScore = 0;
       }
@@ -351,6 +356,22 @@ Score* Score::clone()
       score->addLayoutFlags(LayoutFlag::FIX_PITCH_VELO);
       score->doLayout();
       return score;
+      }
+
+//---------------------------------------------------------
+//   Score::onElementDestruction
+//    Ensure correct state of the score after destruction
+//    of the element (e.g. remove invalid pointers etc.).
+//---------------------------------------------------------
+
+void Score::onElementDestruction(Element* e)
+      {
+      Score* score = e->score();
+      if (!score || Score::validScores.find(score) == Score::validScores.end()) {
+            // No score or the score is already deleted
+            return;
+            }
+      score->selection().remove(e);
       }
 
 //---------------------------------------------------------
@@ -2539,6 +2560,7 @@ void Score::sortStaves(QList<int>& dst)
                         sp->setTrack2(idx * VOICES +(sp->track2() % VOICES)); // at least keep the voice...
                   }
             }
+      setLayoutAll();
       }
 
 //---------------------------------------------------------
@@ -2764,8 +2786,8 @@ void Score::select(Element* e, SelectType type, int staffIdx)
             if (ee->isNote())
                   ee = ee->parent();
             int tick = toChordRest(ee)->segment()->tick();
-            if (playPos() != tick)
-                  setPlayPos(tick);
+            if (masterScore()->playPos() != tick)
+                  masterScore()->setPlayPos(tick);
             }
       if (MScore::debugMode)
             qDebug("select element <%s> type %d(state %d) staff %d",
@@ -3025,8 +3047,7 @@ void Score::collectMatch(void* data, Element* e)
       else if (p->subtypeValid && p->subtype != e->subtype())
             return;
 
-      if ((p->staffStart != -1)
-         && ((p->staffStart > e->staffIdx()) || (p->staffEnd <= e->staffIdx())))
+      if ((p->staffStart != -1) && ((p->staffStart > e->staffIdx()) || (p->staffEnd <= e->staffIdx())))
             return;
 
       if (p->voice != -1 && p->voice != e->voice())
@@ -3561,6 +3582,15 @@ Cursor* Score::newCursor()
 void Score::addSpanner(Spanner* s)
       {
       _spanner.addSpanner(s);
+      }
+
+//---------------------------------------------------------
+//   alreadyInList
+//---------------------------------------------------------
+
+bool Score::alreadyInList(Spanner* s) const
+      {
+      return _spanner.alreadyInList(s);
       }
 
 //---------------------------------------------------------
@@ -4278,6 +4308,23 @@ QVariant Score::propertyDefault(Pid /*id*/) const
 void Score::setStyle(const MStyle& s)
       {
       style() = s;
+      }
+
+//---------------------------------------------------------
+//   getTextStyleUserName
+//---------------------------------------------------------
+
+QString Score::getTextStyleUserName(Tid tid)
+      {
+      QString name = "";
+      if (int(tid) >= int(Tid::USER1) && int(tid) <= int(Tid::USER6)) {
+            int idx = int(tid) - int(Tid::USER1);
+            Sid sid[] = { Sid::user1Name, Sid::user2Name, Sid::user3Name, Sid::user4Name, Sid::user5Name, Sid::user6Name };
+            name = styleSt(sid[idx]);
+            }
+      if (name == "")
+            name = textStyleUserName(tid);
+      return name;
       }
 
 //---------------------------------------------------------

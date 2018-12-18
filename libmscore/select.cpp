@@ -319,9 +319,10 @@ void Selection::clear()
 
 void Selection::remove(Element* el)
       {
-      _el.removeOne(el);
+      const bool removed = _el.removeOne(el);
       el->setSelected(false);
-      updateState();
+      if (removed)
+            updateState();
       }
 
 //---------------------------------------------------------
@@ -584,6 +585,7 @@ void Selection::setRangeTicks(int tick1, int tick2, int staffStart, int staffEnd
       {
       Q_ASSERT(staffEnd > staffStart && staffStart >= 0 && staffEnd >= 0 && staffEnd <= _score->nstaves());
 
+      deselectAll();
       _plannedTick1 = tick1;
       _plannedTick2 = tick2;
       _startSegment = _endSegment = _activeSegment = nullptr;

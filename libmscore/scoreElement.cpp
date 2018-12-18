@@ -206,7 +206,8 @@ void ScoreElement::initElementStyle(const ElementStyle* ss)
       for (size_t i = 0; i < n; ++i)
             _propertyFlagsList[i] = PropertyFlags::STYLED;
       for (const StyledProperty& spp : *_elementStyle)
-            setProperty(spp.pid, styleValue(spp.pid, spp.sid));
+//            setProperty(spp.pid, styleValue(spp.pid, spp.sid));
+            setProperty(spp.pid, styleValue(spp.pid, getPropertyStyle(spp.pid)));
       }
 
 //---------------------------------------------------------
@@ -379,16 +380,16 @@ void ScoreElement::writeProperty(XmlWriter& xml, Pid pid) const
             return;
             }
       PropertyFlags f = propertyFlags(pid);
-      QVariant d = (f == PropertyFlags::NOSTYLE) ? propertyDefault(pid) : QVariant();
+      QVariant d = (f != PropertyFlags::STYLED) ? propertyDefault(pid) : QVariant();
 
       if (pid == Pid::FONT_STYLE) {
             FontStyle ds = FontStyle(d.isValid() ? d.toInt() : 0);
             FontStyle fs = FontStyle(p.toInt());
-            if ((fs & FontStyle::Bold) !=  (ds & FontStyle::Bold))
+            if ((fs & FontStyle::Bold) != (ds & FontStyle::Bold))
                   xml.tag("bold", fs & FontStyle::Bold);
-            if ((fs & FontStyle::Italic) && (ds & FontStyle::Italic))
-                  xml.tag("italic", fs & FontStyle::Bold);
-            if ((fs & FontStyle::Underline) && (ds & FontStyle::Underline))
+            if ((fs & FontStyle::Italic) != (ds & FontStyle::Italic))
+                  xml.tag("italic", fs & FontStyle::Italic);
+            if ((fs & FontStyle::Underline) != (ds & FontStyle::Underline))
                   xml.tag("underline", fs & FontStyle::Underline);
             return;
             }
@@ -603,6 +604,8 @@ void LinkedElements::setLid(Score* score, int id)
 
 //---------------------------------------------------------
 //   mainElement
+//    Returns "main" linked element which is expected to
+//    be written to the file prior to others.
 //---------------------------------------------------------
 
 ScoreElement* LinkedElements::mainElement()
@@ -610,11 +613,24 @@ ScoreElement* LinkedElements::mainElement()
       if (isEmpty())
             return nullptr;
       MasterScore* ms = at(0)->masterScore();
-      for (ScoreElement* se : *this) {
-            if (se->score() == ms)
-                  return se;
-            }
-      return front();
+      const bool elements = at(0)->isElement();
+      return *std::min_element(begin(), end(), [ms, elements](ScoreElement* s1, ScoreElement* s2) {
+            if (s1->score() == ms && s2->score() != ms)
+                  return true;
+            if (elements) {
+                  if (s1->score() != s2->score())
+                        return false;
+                  // Now we compare either two elements from master score
+                  // or two elements from excerpt.
+                  Element* e1 = toElement(s1);
+                  Element* e2 = toElement(s2);
+                  if (e1->track() < e2->track())
+                        return true;
+                  if (e1->track() == e2->track() && e1->tick() < e2->tick())
+                        return true;
+                  }
+            return false;
+            });
       }
 
 //---------------------------------------------------------
@@ -689,7 +705,7 @@ void ScoreElement::styleChanged()
       for (const StyledProperty& spp : *_elementStyle) {
             PropertyFlags f = propertyFlags(spp.pid);
             if (f == PropertyFlags::STYLED)
-                  setProperty(spp.pid, styleValue(spp.pid, spp.sid));
+                  setProperty(spp.pid, styleValue(spp.pid, getPropertyStyle(spp.pid)));
             }
       }
 
