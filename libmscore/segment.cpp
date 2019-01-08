@@ -121,7 +121,7 @@ Segment::Segment(Measure* m, SegmentType st, int t)
       {
       setParent(m);
       _segmentType = st;
-      _tick = t;
+      setRtick(t);
       init();
       }
 
@@ -261,6 +261,14 @@ Segment* Segment::next1MM(SegmentType types) const
       return 0;
       }
 
+Segment* Segment::next1MMenabled() const
+      {
+      Segment* s = next1MM();
+      while (s && !s->enabled())
+            s = s->next1MM();
+      return s;
+      }
+
 //---------------------------------------------------------
 //   next
 //    got to next segment which has subtype in types
@@ -303,12 +311,28 @@ Segment* Segment::prev1() const
       return m ? m->last() : 0;
       }
 
+Segment* Segment::prev1enabled() const
+      {
+      Segment* s = prev1();
+      while (s && !s->enabled())
+            s = s->prev1();
+      return s;
+      }
+
 Segment* Segment::prev1MM() const
       {
       if (prev())
             return prev();
       Measure* m = measure()->prevMeasureMM();
       return m ? m->last() : 0;
+      }
+
+Segment* Segment::prev1MMenabled() const
+      {
+      Segment* s = prev1MM();
+      while (s && !s->enabled())
+            s = s->prev1MM();
+      return s;
       }
 
 Segment* Segment::prev1(SegmentType types) const
@@ -764,26 +788,6 @@ void Segment::checkEmpty() const
       }
 
 //---------------------------------------------------------
-//   rfrac
-//    return relative position of segment in measure
-//---------------------------------------------------------
-
-Fraction Segment::rfrac() const
-      {
-      return Fraction::fromTicks(_tick);
-      }
-
-//---------------------------------------------------------
-//   afrac
-//    return absolute position of segment
-//---------------------------------------------------------
-
-Fraction Segment::afrac() const
-      {
-      return Fraction::fromTicks(tick());
-      }
-
-//---------------------------------------------------------
 //   swapElements
 //---------------------------------------------------------
 
@@ -841,7 +845,7 @@ QVariant Segment::getProperty(Pid propertyId) const
       {
       switch (propertyId) {
             case Pid::TICK:
-                  return _tick;
+                  return _tick.ticks();
             case Pid::LEADING_SPACE:
                   return extraLeadingSpace();
             default:
@@ -871,7 +875,7 @@ bool Segment::setProperty(Pid propertyId, const QVariant& v)
       {
       switch (propertyId) {
             case Pid::TICK:
-                  _tick = v.toInt();
+                  setRtick(v.toInt());
                   break;
             case Pid::LEADING_SPACE:
                   setExtraLeadingSpace(v.value<Spatium>());
@@ -1225,7 +1229,7 @@ Element* Segment::firstInNextSegments(int activeStaff)
       Element* re = 0;
       Segment* seg = this;
       while (!re) {
-            seg = seg->next1MM(SegmentType::All);
+            seg = seg->next1MMenabled();
             if (!seg) //end of staff, or score
                   break;
 
@@ -1493,12 +1497,12 @@ Element* Segment::nextElement(int activeStaff)
                         if (s)
                               return s->spannerSegments().front();
                         }
-                  Segment* nextSegment = this->next1();
+                  Segment* nextSegment = this->next1enabled();
                   while (nextSegment) {
                         Element* nextEl = nextSegment->firstElementOfSegment(nextSegment, activeStaff);
                         if (nextEl)
                               return nextEl;
-                        nextSegment = nextSegment->next1();
+                        nextSegment = nextSegment->next1enabled();
                         }
                   break;
                   }
@@ -1512,12 +1516,12 @@ Element* Segment::nextElement(int activeStaff)
                   if (sp)
                         return sp->spannerSegments().front();
 
-                  Segment* nextSegment = this->next1();
+                  Segment* nextSegment = this->next1enabled();
                   while (nextSegment) {
                         Element* nextEl = nextSegment->firstElementOfSegment(nextSegment, activeStaff);
                         if (nextEl)
                               return nextEl;
-                        nextSegment = nextSegment->next1();
+                        nextSegment = nextSegment->next1enabled();
                         }
                   break;
                   }
@@ -1552,12 +1556,12 @@ Element* Segment::nextElement(int activeStaff)
                   Spanner* s = firstSpanner(activeStaff);
                   if (s)
                         return s->spannerSegments().front();
-                  Segment* nextSegment =  seg->next1();
+                  Segment* nextSegment =  seg->next1enabled();
                   while (nextSegment) {
                         nextEl = nextSegment->firstElementOfSegment(nextSegment, activeStaff);
                         if (nextEl)
                               return nextEl;
-                        nextSegment = nextSegment->next1();
+                        nextSegment = nextSegment->next1enabled();
                         }
                   }
                   break;
@@ -1606,7 +1610,7 @@ Element* Segment::prevElement(int activeStaff)
                          el = s->element(--track);
                          if (track == 0) {
                                track = score()->nstaves() * VOICES - 1;
-                               s = s->prev1();
+                               s = s->prev1enabled();
                                }
                          }
                    if (el->staffIdx() != activeStaff)
@@ -1676,13 +1680,13 @@ Element* Segment::prevElement(int activeStaff)
                               return prev;
                               }
                         }
-                   Segment* prevSeg = seg->prev1();
+                   Segment* prevSeg = seg->prev1enabled();
                    if (!prevSeg)
                          return score()->lastElement();
 
                    prev = lastElementOfSegment(prevSeg, activeStaff);
                    while (!prev && prevSeg) {
-                         prevSeg = prevSeg->prev1();
+                         prevSeg = prevSeg->prev1enabled();
                          prev = lastElementOfSegment(prevSeg, activeStaff);
                          }
                    if (!prevSeg)
@@ -1741,7 +1745,7 @@ Element* Segment::lastInPrevSegments(int activeStaff)
       Segment* seg = this;
 
       while (!re) {
-            seg = seg->prev1MM(SegmentType::All);
+            seg = seg->prev1MMenabled();
             if (!seg) //end of staff, or score
                   break;
 
@@ -1764,7 +1768,7 @@ Element* Segment::lastInPrevSegments(int activeStaff)
                   if ((re = seg->lastElement(activeStaff -1)) != 0)
                         return re;
 
-                  seg = seg->prev1(SegmentType::All);
+                  seg = seg->prev1enabled();
                   }
             }
 
@@ -1861,6 +1865,7 @@ void Segment::createShape(int staffIdx)
                   s.add(QRectF(0.0, 0.0, w, spatium() * 4.0).translated(bl->pos()));
 #endif
                   }
+            s.addHorizontalSpacing(Shape::SPACING_GENERAL, 0, 0);
             return;
             }
 #if 0
@@ -2013,6 +2018,14 @@ qreal Segment::minHorizontalDistance(Segment* ns, bool systemHeaderGap) const
 //                  qreal dd = minRight() + ns->minLeft() + spatium();
 //                  w = qMax(d, dd);
                   w += score()->styleP(Sid::barNoteDistance);
+
+                  if (st == SegmentType::StartRepeatBarLine) {
+                        if (Element* barLine = element(0)) {
+                              const qreal blWidth = barLine->width();
+                              if (w < blWidth)
+                                    w += blWidth;
+                              }
+                        }
                   }
             // d -= ns->minLeft() * .7;      // hack
             // d = qMax(d, ns->minLeft());
@@ -2057,6 +2070,84 @@ qreal Segment::minHorizontalDistance(Segment* ns, bool systemHeaderGap) const
       if (ns)
             w += ns->extraLeadingSpace().val() * spatium();
       return w;
+      }
+
+//---------------------------------------------------------
+//   setTick
+//    *** deprecated ***
+//---------------------------------------------------------
+
+void Segment::setTick(int t)
+      {
+      setRtick(t - measure()->tick());
+      }
+
+//---------------------------------------------------------
+//   tick
+//    *** deprecated ***
+//---------------------------------------------------------
+
+int Segment::tick() const
+      {
+      return rtick() + measure()->tick();
+      }
+
+//---------------------------------------------------------
+//   ticks
+//---------------------------------------------------------
+
+int Segment::ticks() const
+      {
+      return _ticks.ticks();
+      }
+
+//---------------------------------------------------------
+//   setTicks
+//---------------------------------------------------------
+
+void Segment::setTicks(int val)
+      {
+      _ticks = Fraction::fromTicks(val);
+      }
+
+//---------------------------------------------------------
+//   rtick
+//    tickposition relative to measure start
+//---------------------------------------------------------
+
+int Segment::rtick() const
+      {
+      return _tick.ticks();
+      }
+
+//---------------------------------------------------------
+//   setRtick
+//---------------------------------------------------------
+
+void Segment::setRtick(int val)
+      {
+      _tick = Fraction::fromTicks(val);
+      }
+
+//---------------------------------------------------------
+//   rfrac
+//    return relative position of segment in measure
+//---------------------------------------------------------
+
+Fraction Segment::rfrac() const
+      {
+      return _tick;
+      }
+
+//---------------------------------------------------------
+//   afrac
+//    return absolute position of segment
+//    *** deprecated ***
+//---------------------------------------------------------
+
+Fraction Segment::afrac() const
+      {
+      return _tick + Fraction::fromTicks(measure()->tick());
       }
 
 }           // namespace Ms

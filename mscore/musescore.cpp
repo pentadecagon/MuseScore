@@ -175,7 +175,7 @@ bool ignoreWarnings = false;
 bool exportScoreMedia = false;
 bool exportScoreMp3 = false;
 bool exportScorePartsPdf = false;
-      
+
 QString mscoreGlobalShare;
 
 static QString outFileName;
@@ -1222,7 +1222,6 @@ MuseScore::MuseScore()
       spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
       feedbackTools->addWidget(spacer);
       // And, finally, add the buttons themselves.
-      feedbackTools->addWidget(new AccessibleToolButton(feedbackTools, getAction("report-bug")));
       AccessibleToolButton* feedbackButton = new AccessibleToolButton(feedbackTools, getAction("leave-feedback"));
       feedbackButton->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
       feedbackTools->addWidget(feedbackButton);
@@ -1870,7 +1869,8 @@ MuseScore::MuseScore()
       connect(im, SIGNAL(anchorRectangleChanged()), SLOT(inputMethodAnchorRectangleChanged()));
       connect(im, SIGNAL(animatingChanged()), SLOT(inputMethodAnimatingChanged()));
       connect(im, SIGNAL(cursorRectangleChanged()), SLOT(inputMethodCursorRectangleChanged()));
-      connect(im, SIGNAL(inputDirectionChanged(Qt::LayoutDirection newDirection)), SLOT(inputMethodInputDirectionChanged(Qt::LayoutDirection newDirection)));
+//signal does not exist:
+//      connect(im, SIGNAL(inputDirectionChanged(Qt::LayoutDirection newDirection)), SLOT(inputMethodInputDirectionChanged(Qt::LayoutDirection newDirection)));
       connect(im, SIGNAL(inputItemClipRectangleChanged()), SLOT(inputMethodInputItemClipRectangleChanged()));
       connect(im, SIGNAL(keyboardRectangleChanged()), SLOT(inputMethodKeyboardRectangleChanged()));
       connect(im, SIGNAL(localeChanged()), SLOT(inputMethodLocaleChanged()));
@@ -3134,6 +3134,7 @@ void setMscoreLocale(QString _localeName)
       // try to replicate QTranslator.load algorithm in our particular case
       loadTranslation("mscore", _localeName);
       loadTranslation("instruments", _localeName);
+      loadTranslation("tours", _localeName);
 
       QString resourceDir;
 #if defined(Q_OS_MAC) || defined(Q_OS_WIN)
@@ -3469,7 +3470,7 @@ static bool processNonGui(const QStringList& argv)
             return mscore->exportMp3AsJSON(argv[0]);
       else if (exportScorePartsPdf)
             return mscore->exportPartsPdfsToJSON(argv[0]);
-      
+
       if (pluginMode) {
             loadScores(argv);
             QString pn(pluginName);
@@ -3842,7 +3843,7 @@ void MuseScore::inputMethodCursorRectangleChanged()
 //   inputMethodInputDirectionChanged
 //---------------------------------------------------------
 
-void MuseScore::inputMethodInputDirectionChanged(Qt::LayoutDirection newDirection)
+void MuseScore::inputMethodInputDirectionChanged(Qt::LayoutDirection /*newDirection*/)
       {
 //      qDebug("inputMethod InputDirection Changed: (QLocale::LayoutDirection enum) #%d", newDirection);
       }
@@ -4626,6 +4627,8 @@ void MuseScore::undoRedo(bool undo)
       endCmd();
       if (_inspector)
             _inspector->update();
+      if (pianorollEditor)
+            pianorollEditor->update();
       }
 
 //---------------------------------------------------------
@@ -7072,7 +7075,7 @@ int main(int argc, char* av[])
             MScore::noGui = true;
             converterMode = true;
             }
-      
+
       if (parser.isSet("score-mp3")) {
             exportScoreMp3 = true;
             MScore::noGui = true;
@@ -7084,7 +7087,7 @@ int main(int argc, char* av[])
             MScore::noGui = true;
             converterMode = true;
             }
-      
+
       if (parser.isSet("raw-diff")) {
             MScore::noGui = true;
             rawDiffMode = true;
@@ -7462,13 +7465,13 @@ bool MuseScore::exportPartsPdfsToJSON(const QString& inFilePath, const QString& 
       MasterScore* score = mscore->readScore(inFilePath);
       if (!score)
             return false;
-      
+
       QString outPath = QFileInfo(inFilePath).path() + "/";
-      
+
       QJsonObject jsonForPdfs;
       QString outName = outPath + QFileInfo(inFilePath).baseName() + ".pdf";
       jsonForPdfs["score"] = outName;
-      
+
       //save score pdf
       if (!styleFile.isEmpty()) {
             QFile f(styleFile);
@@ -7476,14 +7479,9 @@ bool MuseScore::exportPartsPdfsToJSON(const QString& inFilePath, const QString& 
                   score->style().load(&f);
       }
       score->switchToPageMode();
-      
-      QByteArray pdfData;
-      QBuffer scoreDevice(&pdfData);
-      scoreDevice.open(QIODevice::ReadWrite);
-      QPdfWriter writer(&scoreDevice);
-      bool res = mscore->savePdf(score, writer);
-      jsonForPdfs["scoreBin"] = QString::fromLatin1(pdfData.toBase64());
-      
+
+      jsonForPdfs["scoreBin"] = mscore->exportPdfAsJSON(score);
+
       //save extended score+parts and separate parts pdfs
       //if no parts, generate parts from existing instruments
       if (score->excerpts().size() == 0) {
@@ -7497,7 +7495,7 @@ bool MuseScore::exportPartsPdfsToJSON(const QString& inFilePath, const QString& 
                   excerptCmdFake->redo(nullptr);
             }
       }
-      
+
       QList<Score*> scores;
       scores.append(score);
       QJsonArray partsArray;
@@ -7506,27 +7504,22 @@ bool MuseScore::exportPartsPdfsToJSON(const QString& inFilePath, const QString& 
             scores.append(e->partScore());
             QJsonValue partNameVal(e->title());
             partsNamesArray.append(partNameVal);
-            QByteArray partData;
-            QBuffer partDevice(&partData);
-            partDevice.open(QIODevice::ReadWrite);
-            QPdfWriter partWriter(&partDevice);
-            res &= mscore->savePdf(e->partScore(), partWriter);
-            QJsonValue partVal(QString::fromLatin1(partData.toBase64()));
+            QJsonValue partVal(exportPdfAsJSON(e->partScore()));
             partsArray.append(partVal);
       }
       jsonForPdfs["parts"] = partsNamesArray;
       jsonForPdfs["partsBin"] = partsArray;
-      
+
       jsonForPdfs["scoreFullPostfix"] = QString("-Score_and_parts") + ".pdf";
-      
+
       QString tempFileName = outPath + "tempPdf.pdf";
-      res &= mscore->savePdf(scores, tempFileName);
+      bool res = mscore->savePdf(scores, tempFileName);
       QFile tempPdf(tempFileName);
       tempPdf.open(QIODevice::ReadWrite);
       QByteArray fullScoreData = tempPdf.readAll();
       tempPdf.remove();
       jsonForPdfs["scoreFullBin"] = QString::fromLatin1(fullScoreData.toBase64());
-      
+
       QJsonDocument jsonDoc(jsonForPdfs);
       const QString& jsonPath{outFilePath};
       QFile file(jsonPath);
@@ -7535,7 +7528,7 @@ bool MuseScore::exportPartsPdfsToJSON(const QString& inFilePath, const QString& 
             file.write(jsonDoc.toJson(QJsonDocument::Compact));
             file.close();
       }
-      
+
       delete score;
       return res;
       }

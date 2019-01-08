@@ -274,8 +274,12 @@ Chord::Chord(const Chord& c, bool link)
             Tremolo* t = new Tremolo(*(c._tremolo));
             if (link) {
                   score()->undo(new Link(t, const_cast<Tremolo*>(c._tremolo)));
-                  if (c._tremolo->twoNotes())
-                        t->setChords(0, 0);
+                  if (c._tremolo->twoNotes()) {
+                        if (c._tremolo->chord1() == &c)
+                              t->setChords(this, nullptr);
+                        else
+                              t->setChords(nullptr, this);
+                        }
                   }
             add(t);
             }
@@ -421,6 +425,60 @@ QPointF Chord::stemPosBeam() const
       }
 
 //---------------------------------------------------------
+//   setTremolo
+//---------------------------------------------------------
+
+void Chord::setTremolo(Tremolo* tr)
+      {
+      if (tr == _tremolo)
+            return;
+
+      if (_tremolo) {
+            if (_tremolo->twoNotes()) {
+                  TDuration d;
+                  const Fraction f = duration();
+                  if (f.numerator() > 0)
+                        d = TDuration(f);
+                  else {
+                        d = _tremolo->durationType();
+                        const int dots = d.dots();
+                        d = d.shift(1);
+                        d.setDots(dots);
+                        }
+
+                  setDurationType(d);
+                  Chord* other = _tremolo->chord1() == this ? _tremolo->chord2() : _tremolo->chord1();
+                  _tremolo = nullptr;
+                  if (other)
+                        other->setTremolo(nullptr);
+                  }
+            else
+                  _tremolo = nullptr;
+            }
+
+      if (tr) {
+            if (tr->twoNotes()) {
+                  TDuration d = tr->durationType();
+                  if (!d.isValid()) {
+                        d = durationType();
+                        const int dots = d.dots();
+                        d = d.shift(-1);
+                        d.setDots(dots);
+                        tr->setDurationType(d);
+                        }
+
+                  setDurationType(d);
+                  Chord* other = tr->chord1() == this ? tr->chord2() : tr->chord1();
+                  _tremolo = tr;
+                  if (other)
+                        other->setTremolo(tr);
+                  }
+            else
+                  _tremolo = tr;
+            }
+      }
+
+//---------------------------------------------------------
 //   add
 //---------------------------------------------------------
 
@@ -459,24 +517,7 @@ void Chord::add(Element* e)
                   _arpeggio = toArpeggio(e);
                   break;
             case ElementType::TREMOLO:
-                  {
-                  Tremolo* tr = toTremolo(e);
-                  if (tr->twoNotes()) {
-                        if (!(_tremolo && _tremolo->twoNotes())) {
-                              TDuration d = durationType();
-                              int dots = d.dots();
-                              d  = d.shift(-1);
-                              d.setDots(dots);
-                              if (tr->chord1())
-                                    tr->chord1()->setDurationType(d);
-                              if (tr->chord2())
-                                    tr->chord2()->setDurationType(d);
-                              }
-                        if (tr->chord2())
-                              tr->chord2()->setTremolo(tr);
-                        }
-                  _tremolo = tr;
-                  }
+                  setTremolo(toTremolo(e));
                   break;
             case ElementType::GLISSANDO:
                   _endsGlissando = true;
@@ -559,25 +600,7 @@ void Chord::remove(Element* e)
                   _arpeggio = 0;
                   break;
             case ElementType::TREMOLO:
-                  {
-                  Tremolo* tremolo = toTremolo(e);
-                  if (tremolo->twoNotes()) {
-                        TDuration d = durationType();
-                        int dots = d.dots();
-                        d          = d.shift(1);
-                        d.setDots(dots);
-                        Fraction f = duration();
-                        if (f.numerator() > 0)
-                              d = TDuration(f);
-                        if (tremolo->chord1())
-                              tremolo->chord1()->setDurationType(d);
-                        if (tremolo->chord2()) {
-                              tremolo->chord2()->setDurationType(d);
-                              tremolo->chord2()->setTremolo(0);
-                              }
-                        }
-                  _tremolo = 0;
-                  }
+                  setTremolo(nullptr);
                   break;
             case ElementType::GLISSANDO:
                   _endsGlissando = false;
@@ -1075,6 +1098,7 @@ bool Chord::readProperties(XmlReader& e)
             _tremolo->setTrack(track());
             _tremolo->read(e);
             _tremolo->setParent(this);
+            _tremolo->setDurationType(durationType());
             }
       else if (tag == "tickOffset")       // obsolete
             ;
@@ -1175,12 +1199,10 @@ void Chord::processSiblings(std::function<void(Element*)> func) const
             func(_tremolo);
       for (LedgerLine* ll = _ledgerLines; ll; ll = ll->next())
             func(ll);
-
       for (Articulation* a : _articulations)
             func(a);
       for (Note* note : _notes)
             func(note);
-
       for (Element* e : el())
             func(e);
       for (Chord* chord : _graceNotes)    // process grace notes last, needed for correct shape calculation
@@ -3104,8 +3126,10 @@ Shape Chord::shape() const
 //            shape.add(_tremolo->shape().translated(_tremolo->pos()));
       for (Note* note : _notes)
             shape.add(note->shape().translated(note->pos()));
-      for (Element* e : el())
-            shape.add(e->shape().translated(e->pos()));
+      for (Element* e : el()) {
+            if (e->autoplace() && e->visible())
+                  shape.add(e->shape().translated(e->pos()));
+            }
       for (Chord* chord : _graceNotes)    // process grace notes last, needed for correct shape calculation
             shape.add(chord->shape().translated(chord->pos()));
       shape.add(ChordRest::shape());      // add lyrics
@@ -3118,7 +3142,7 @@ Shape Chord::shape() const
 
 //---------------------------------------------------------
 //   layoutArticulations
-//    layout tenuto and staccatao
+//    layout tenuto and staccato
 //    called before layouting slurs
 //---------------------------------------------------------
 
@@ -3227,8 +3251,9 @@ void Chord::layoutArticulations()
 
 //---------------------------------------------------------
 //   layoutArticulations2
-//    Called after layouting slurs.
-//    Layout all articulations outside of slur start/end.
+//    Called after layouting systems
+//    Tentatively layout all articulations
+//    To be finished after laying out slurs
 //---------------------------------------------------------
 
 void Chord::layoutArticulations2()
@@ -3311,14 +3336,56 @@ void Chord::layoutArticulations2()
                   }
             }
       for (Articulation* a : _articulations) {
-            if (a->autoplace()) {
+            if (a->autoplace() && a->visible()) {
                   Segment* s = segment();
                   Measure* m = s->measure();
-                  QRectF r = a->bbox().translated(a->pos() + pos() + s->pos() + m->pos());
-                  m->system()->staff(a->staffIdx())->skyline().add(r);
+                  QRectF r = a->bbox().translated(a->pos() + pos());
+                  s->staffShape(staffIdx()).add(r);
+                  r = a->bbox().translated(a->pos() + pos() + s->pos() + m->pos());
+                  m->system()->staff(staffIdx())->skyline().add(r);
+                  }
+            }
+      }
+
+//---------------------------------------------------------
+//   layoutArticulations3
+//    Called after layouting slurs
+//    Fix up articulations that need to go outside the slur
+//---------------------------------------------------------
+
+void Chord::layoutArticulations3(Slur* slur)
+      {
+      SlurSegment* ss;
+      if (this == slur->startCR())
+            ss = slur->frontSegment();
+      else if (this == slur->endCR())
+            ss = slur->backSegment();
+      else
+            return;
+      Segment* s = segment();
+      Measure* m = measure();
+      SysStaff* sstaff = m->system() ? m->system()->staff(staffIdx()) : nullptr;
+      for (Articulation* a : _articulations) {
+            if (a->layoutCloseToNote() || !a->autoplace() || !slur->autoplace() || !slur->visible())
+                  continue;
+            Shape aShape = a->shape().translated(a->pos() + pos() + s->pos() + m->pos());
+            Shape sShape = ss->shape().translated(ss->pos());
+            if (aShape.intersects(sShape)) {
+                  qreal d = score()->styleP(Sid::dynamicsMinDistance);
+                  if (slur->up()) {
+                        d += qMax(aShape.minVerticalDistance(sShape), 0.0);
+                        a->rypos() -= d;
+                        aShape.translateY(-d);
+                        }
+                  else {
+                        d += qMax(sShape.minVerticalDistance(aShape), 0.0);
+                        a->rypos() += d;
+                        aShape.translateY(d);
+                        }
+                  if (sstaff)
+                        sstaff->skyline().add(aShape);
                   }
             }
       }
 
 }
-

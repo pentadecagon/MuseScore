@@ -77,10 +77,10 @@ include (CreatePrecompiledHeader)
 # set(CMAKE_VERBOSE_MAKEFILE ON)
 
 set(CMAKE_AUTOMOC     TRUE)
-set(MSCORE_UNSTABLE   TRUE)          # Mark as unstable
-set(MSCORE_RELEASE_CHANNEL "devel")
+set(MSCORE_UNSTABLE   FALSE)          # Mark as unstable
+#set(MSCORE_RELEASE_CHANNEL "devel")
 #set(MSCORE_RELEASE_CHANNEL "testing")
-#set(MSCORE_RELEASE_CHANNEL "stable")
+set(MSCORE_RELEASE_CHANNEL "stable")
 set(USE_SSE           TRUE)
 set(SCRIPT_INTERFACE  TRUE)
 
@@ -107,7 +107,7 @@ endif (NOT APPLE AND NOT MINGW AND NOT MSVC)
 option(AEOLUS        "Enable pipe organ synthesizer"      OFF)
 option(ZERBERUS      "Enable experimental SFZ sampler"    ON)
 option(OSC           "Enable OSC remote control protocol" ON)
-option(OMR           "Enable PDF import"  ON)                 # OMR - optical music recognition
+option(OMR           "Enable PDF import"  OFF)                 # OMR - optical music recognition
 # For installation see: http://ubuntuforums.org/showthread.php?t=1647350
 option(OCR           "Enable OCR, requires OMR" OFF)           # Requires tesseract 3.0, needs work on mac/win
 option(SOUNDFONT3    "Ogg Vorbis compressed fonts" ON)         # Enable Ogg Vorbis compressed fonts, requires Ogg & Vorbis
@@ -831,9 +831,11 @@ include(Packaging)
 
 add_custom_target(lupdate
    COMMAND ${PROJECT_SOURCE_DIR}/build/gen-qt-projectfile ${PROJECT_SOURCE_DIR} > mscore.pro
-   COMMAND Qt5::lupdate -no-obsolete ${PROJECT_BINARY_DIR}/mscore.pro
+   COMMAND Qt5::lupdate ${PROJECT_BINARY_DIR}/mscore.pro
    COMMAND ${PROJECT_SOURCE_DIR}/build/gen-instruments-projectfile ${PROJECT_SOURCE_DIR}/share/instruments > instruments.pro
-   COMMAND Qt5::lupdate -no-obsolete ${PROJECT_BINARY_DIR}/instruments.pro
+   COMMAND Qt5::lupdate ${PROJECT_BINARY_DIR}/instruments.pro
+   COMMAND ${PROJECT_SOURCE_DIR}/build/gen-tours-projectfile ${PROJECT_SOURCE_DIR}/share/tours > tours.pro
+   COMMAND Qt5::lupdate ${PROJECT_BINARY_DIR}/tours.pro
    WORKING_DIRECTORY ${PROJECT_BINARY_DIR}
    )
 
@@ -845,6 +847,9 @@ file(GLOB INSTRUMENTS_TS_FILES
 file(GLOB MSCORE_TS_FILES
    "share/locale/mscore*.ts"
 )
+file(GLOB TOURS_TS_FILES
+   "share/locale/tours*.ts"
+)
 file(GLOB QT_TS_FILES
    "share/locale/qt*.ts"
 )
@@ -852,6 +857,7 @@ file(GLOB QT_TS_FILES
 add_custom_target(lrelease
    COMMAND Qt5::lrelease ${INSTRUMENTS_TS_FILES}
    COMMAND Qt5::lrelease ${MSCORE_TS_FILES}
+   COMMAND Qt5::lrelease ${TOURS_TS_FILES}
    COMMAND Qt5::lrelease ${QT_TS_FILES}
    WORKING_DIRECTORY ${PROJECT_BINARY_DIR}
 )

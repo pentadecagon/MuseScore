@@ -134,9 +134,12 @@ void KeySig::layout()
       Measure* prevMeasure = measure() ? measure()->prevMeasure() : 0;
 
       // If we're not force hiding naturals (Continuous panel), use score style settings
-      if (!_hideNaturals)
-            naturalsOn = (prevMeasure && !prevMeasure->sectionBreak()
-               && (score()->styleI(Sid::keySigNaturals) != int(KeySigNatural::NONE))) || (t1 == 0);
+      if (!_hideNaturals) {
+            const bool newSection = (!segment()
+               || (segment()->rtick() == 0 && (!prevMeasure || prevMeasure->sectionBreak()))
+               );
+            naturalsOn = !newSection && (score()->styleI(Sid::keySigNaturals) != int(KeySigNatural::NONE) || (t1 == 0));
+            }
 
 
       // Don't repeat naturals if shown in courtesy
@@ -259,6 +262,26 @@ void KeySig::layout()
             ks.pos = ks.spos * _spatium;
             addbbox(symBbox(ks.sym).translated(ks.pos));
             }
+      }
+
+//---------------------------------------------------------
+//   shape
+//---------------------------------------------------------
+
+Shape KeySig::shape() const
+      {
+      QRectF box(bbox());
+      const Staff* st = staff();
+      if (st && autoplace() && visible()) {
+            // Extend key signature shape up and down to
+            // the first ledger line height to ensure that
+            // no notes will be too close to the keysig.
+            const qreal sp = spatium();
+            const qreal y = pos().y();
+            box.setTop(std::min(-sp - y, box.top()));
+            box.setBottom(std::max(st->height() - y + sp, box.bottom()));
+            }
+      return Shape(box);
       }
 
 //---------------------------------------------------------

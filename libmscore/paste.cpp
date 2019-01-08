@@ -177,7 +177,8 @@ bool Score::pasteStaff(XmlReader& e, Segment* dst, int dstStaff)
                               Measure* measure = tick2measure(tick);
                               tuplet->setParent(measure);
                               tuplet->setTick(tick);
-                              if (tuplet->rfrac() + tuplet->duration() > measure->len()) {
+                              tuplet->setTuplet(oldTuplet);
+                              if (tuplet->rfrac() + tuplet->actualFraction() > measure->len()) {
                                     delete tuplet;
                                     if (oldTuplet && oldTuplet->elements().empty())
                                           delete oldTuplet;
@@ -334,6 +335,8 @@ bool Score::pasteStaff(XmlReader& e, Segment* dst, int dstStaff)
                            ) {
                               Element* el = Element::name2Element(tag, this);
                               el->setTrack(e.track());      // a valid track might be necessary for el->read() to work
+                              if (el->isFermata())
+                                    el->setPlacement(el->track() & 1 ? Placement::BELOW : Placement::ABOVE);
                               el->read(e);
 
                               Measure* m = tick2measure(e.tick());

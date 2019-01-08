@@ -461,9 +461,11 @@ bool Score::rewriteMeasures(Measure* fm, Measure* lm, const Fraction& ns, int st
 
             int tick1 = m1->tick();
             int tick2 = m2->endTick();
-            auto spanners = s->spannerMap().findContained(tick1, tick2);
-            for (auto i : spanners)
-                  undo(new RemoveElement(i.value));
+            auto spanners = s->spannerMap().findOverlapping(tick1, tick2);
+            for (auto i : spanners) {
+                  if (i.value->tick() >= tick1)
+                        undo(new RemoveElement(i.value));
+                  }
             s->undoRemoveMeasures(m1, m2);
 
             Measure* nfm = 0;
@@ -725,10 +727,15 @@ void Score::cmdAddTimeSig(Measure* fm, int staffIdx, TimeSig* ts, bool local)
             int n = nstaves();
             for (int si = 0; si < n; ++si) {
                   TimeSig* nsig = toTimeSig(seg->element(si * VOICES));
-                  nsig->undoChangeProperty(Pid::TIMESIG_TYPE,       int(ts->timeSigType()));
-                  nsig->undoChangeProperty(Pid::NUMERATOR_STRING,   ts->numeratorString());
+                  nsig->undoChangeProperty(Pid::SHOW_COURTESY, ts->showCourtesySig());
+                  nsig->undoChangeProperty(Pid::TIMESIG_TYPE, int(ts->timeSigType()));
+                  nsig->undoChangeProperty(Pid::TIMESIG, QVariant::fromValue(ts->sig()));
+                  nsig->undoChangeProperty(Pid::NUMERATOR_STRING, ts->numeratorString());
                   nsig->undoChangeProperty(Pid::DENOMINATOR_STRING, ts->denominatorString());
-                  nsig->undoChangeProperty(Pid::GROUPS,             QVariant::fromValue(ts->groups()));
+                  nsig->undoChangeProperty(Pid::TIMESIG_STRETCH, QVariant::fromValue(ts->stretch()));
+                  nsig->undoChangeProperty(Pid::GROUPS,  QVariant::fromValue(ts->groups()));
+                  nsig->setSelected(false);
+                  nsig->setDropTarget(0);
                   }
             }
       else {
@@ -740,7 +747,7 @@ void Score::cmdAddTimeSig(Measure* fm, int staffIdx, TimeSig* ts, bool local)
             //
             if (mf == mScore->firstMeasure() && mf->nextMeasure() && (mf->len() != mf->timesig())) {
                   // handle upbeat
-				  mf->undoChangeProperty(Pid::TIMESIG_NOMINAL, QVariant::fromValue(ns));
+                  mf->undoChangeProperty(Pid::TIMESIG_NOMINAL, QVariant::fromValue(ns));
                   Measure* m = mf->nextMeasure();
                   Segment* s = m->findSegment(SegmentType::TimeSig, m->tick());
                   mf = s ? 0 : mf->nextMeasure();
@@ -2684,7 +2691,7 @@ void Score::insertMeasure(ElementType type, MeasureBase* measure, bool createEmp
                               Measure* pm = mi->prevMeasure();
                               if (pm) {
                                     Segment* ps = pm->findSegment(SegmentType::Clef, tick);
-                                    if (ps) {
+                                    if (ps && ps->enabled()) {
                                           Element* pc = ps->element(staffIdx * VOICES);
                                           if (pc) {
                                                 pcl.push_back(toClef(pc));
@@ -2695,7 +2702,7 @@ void Score::insertMeasure(ElementType type, MeasureBase* measure, bool createEmp
                                           }
                                     }
                               for (Segment* s = mi->first(); s && s->rtick() == 0; s = s->next()) {
-                                    if (s->isHeaderClefType())
+                                    if (!s->enabled())
                                           continue;
                                     Element* e = s->element(staffIdx * VOICES);
                                     if (!e)
@@ -2743,7 +2750,7 @@ void Score::insertMeasure(ElementType type, MeasureBase* measure, bool createEmp
                         }
                   for (Clef* clef : cl) {
                         Clef* nClef = new Clef(*clef);
-                        Segment* s  = m->undoGetSegmentR(SegmentType::Clef, 0);
+                        Segment* s  = m->undoGetSegmentR(SegmentType::HeaderClef, 0);
                         nClef->setParent(s);
                         undoAddElement(nClef);
                         }
@@ -2801,7 +2808,7 @@ void Score::checkSpanner(int startTick, int endTick)
       QList<Spanner*> sl;     // spanners to remove
       QList<Spanner*> sl2;    // spanners to shorten
       auto spanners = _spanner.findOverlapping(startTick, endTick);
-// printf("checkSpanner %d %d\n", startTick, endTick);
+//printf("checkSpanner %d %d\n", startTick, endTick);
 //      for (auto i = spanners.begin(); i < spanners.end(); i++) {
 
       // DEBUG: check all spanner
@@ -2999,7 +3006,7 @@ void Score::timeDelete(Measure* m, Segment* startSegment, const Fraction& f)
       const int len   = f.ticks();
       const int etick = tick + len;
 
-//      printf("time delete %d at %d, start %s\n", len, tick, startSegment->subTypeName());
+//printf("time delete %d at %d, start %s\n", len, tick, startSegment->subTypeName());
 
       Segment* fs = m->first(CR_TYPE);
 
@@ -3053,7 +3060,7 @@ void Score::timeDelete(Measure* m, Segment* startSegment, const Fraction& f)
       int updatedTick = tick;
       for (Segment* s = startSegment; s; s = s->next()) {
             if (s->rtick() >= etick && s->rtick() != updatedTick) {
-//                  printf("   change segment %s tick %d -> %d\n", s->subTypeName(), s->tick(), m->tick() + updatedTick),
+//printf("   change segment %s tick %d -> %d\n", s->subTypeName(), s->tick(), m->tick() + updatedTick),
                   s->undoChangeProperty(Pid::TICK, updatedTick);
                   updatedTick += s->ticks();
                   }
@@ -3461,6 +3468,7 @@ void Score::undoChangeKeySig(Staff* ostaff, int tick, KeySigEvent key)
                   continue;
                   }
             Segment* s   = measure->undoGetSegment(SegmentType::KeySig, tick);
+
             int staffIdx = staff->idx();
             int track    = staffIdx * VOICES;
             KeySig* ks   = toKeySig(s->element(track));
@@ -4308,10 +4316,7 @@ void Score::undoAddElement(Element* element)
                                           }
                                     }
                               }
-                        if (!alreadyInList(nsp))
-                              undo(new AddElement(nsp));
-                        else
-                              qDebug("%s already there", nsp->name());
+                        undo(new AddElement(nsp));
                         }
                   else if (et == ElementType::GLISSANDO)
                         undo(new AddElement(toSpanner(ne)));
@@ -4452,7 +4457,7 @@ void Score::undoAddCR(ChordRest* cr, Measure* measure, int tick)
 
       Tuplet* t = cr->tuplet();
 
-      foreach (Staff* staff, ostaff->staffList()) {
+      for (const Staff* staff : ostaff->staffList()) {
             QList<int> tracks;
             int staffIdx = staff->idx();
             if ((strack & ~3) != staffIdx) // linked staff ?
@@ -4557,6 +4562,7 @@ void Score::undoAddCR(ChordRest* cr, Measure* measure, int tick)
                                           qWarning("linked tuplet not found");
                                     }
                               newcr->setTuplet(nt);
+                              nt->setParent(newcr->measure());
                               }
                         }
 

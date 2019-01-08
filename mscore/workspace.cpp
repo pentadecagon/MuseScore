@@ -40,6 +40,8 @@ QList<Workspace*> Workspace::_workspaces {};
 QList<QPair<QAction*, QString>> Workspace::actionToStringList {};
 QList<QPair<QMenu*  , QString>> Workspace::menuToStringList   {};
 
+const char* Workspace::advancedWorkspaceTranslatableName{ QT_TRANSLATE_NOOP("Ms::Workspace", "Advanced") };
+const char* Workspace::basicWorkspaceTranslatableName{ QT_TRANSLATE_NOOP("Ms::Workspace", "Basic") };
 
 //---------------------------------------------------------
 //   undoWorkspace
@@ -667,6 +669,12 @@ void Workspace::read(XmlReader& e)
                                     preferences.setLocalPreference(preference_name, QVariant(new_bool));
                                     }
                                     break;
+                              case QVariant::LongLong:
+                                    {
+                                    bool new_longlong = e.readLongLong();
+                                    preferences.setLocalPreference(preference_name, QVariant(new_longlong));
+                                    break;
+                                    }
                               default:
                                     qDebug() << preferences.defaultValue(preference_name).type() << " not handled.";
                                     e.unknown();
@@ -922,6 +930,11 @@ void Workspace::readGlobalGUIState()
 
 void Workspace::save()
       {
+      if (!saveComponents)
+            writeGlobalGUIState();
+      if (!saveToolbars)
+            writeGlobalToolBar();
+
       if (_readOnly)
             return;
       PaletteBox* pb = mscore->getPaletteBox();
@@ -984,7 +997,7 @@ QList<Workspace*>& Workspace::workspaces()
                   }
             // hack
             for (int i = 0; i < _workspaces.size(); i++) {
-                  if (_workspaces[i]->translatableName() == "Basic") {
+                  if (_workspaces[i]->translatableName() == basicWorkspaceTranslatableName) {
                         _workspaces.move(i, 0);
                         break;
                         }

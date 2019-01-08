@@ -332,15 +332,17 @@ void BarLine::drawDots(QPainter* painter, qreal x) const
 
       qreal y1l;
       qreal y2l;
-      if (parent() == 0) {    // for use in palette
-            y1l = 2.0 * _spatium;
-            y2l = 3.0 * _spatium;
+      if (parent() == 0) {    // for use in palette (always Bravura)
+            //Bravura shifted repeatDot symbol 0.5sp upper in the font itself (1.272)
+            y1l = 1.5 * _spatium;
+            y2l = 2.5 * _spatium;
             }
       else {
             Staff* staff        = score()->staff(staffIdx());
             const StaffType* st = staff->staffType(tick());
 
-            qreal offset = 0.5 * score()->spatium() * mag();
+            //workaround to make new Bravura font work correctly with repeatDots
+            qreal offset = score()->scoreFont()->name() == "Bravura" ? 0 : 0.5 * score()->spatium() * mag();
             y1l          = st->doty1() * _spatium + offset;
             y2l          = st->doty2() * _spatium + offset;
             }
@@ -623,7 +625,7 @@ Element* BarLine::drop(EditData& data)
                         int spanTo     = bl->spanTo();
                         undoChangeProperty(Pid::BARLINE_SPAN, false);
                         undoChangeProperty(Pid::BARLINE_SPAN_FROM, spanFrom);
-                        undoChangeProperty(Pid::BARLINE_SPAN_FROM, spanTo);
+                        undoChangeProperty(Pid::BARLINE_SPAN_TO, spanTo);
                         }
                   // if drop refers to subtype, update this bar line subtype
                   else

@@ -355,11 +355,12 @@ class ChangeKeySig : public UndoCommand {
       KeySig* keysig;
       KeySigEvent ks;
       bool showCourtesy;
+      bool evtInStaff;
 
       void flip(EditData*) override;
 
    public:
-      ChangeKeySig(KeySig* k, KeySigEvent newKeySig, bool sc) : keysig(k), ks(newKeySig), showCourtesy(sc) {}
+      ChangeKeySig(KeySig* k, KeySigEvent newKeySig, bool sc, bool addEvtToStaff = true);
       UNDO_NAME("ChangeKeySig")
       };
 
@@ -703,6 +704,8 @@ class ChangeMStaffProperties : public UndoCommand {
 class InsertRemoveMeasures : public UndoCommand {
       MeasureBase* fm;
       MeasureBase* lm;
+
+      static std::vector<Clef*> getCourtesyClefs(Measure* m);
 
    protected:
       void removeMeasures();

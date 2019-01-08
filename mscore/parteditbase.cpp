@@ -163,7 +163,7 @@ void PartEdit::playbackVoiceChanged()
                   if (val != staff->playbackVoice(voice)) {
                         switch (voice) {
                               case 0:
-                              printf("undo\n");
+//printf("undo\n");
                                     staff->undoChangeProperty(Pid::PLAYBACK_VOICE1, val);
                                     break;
                               case 1:
@@ -341,7 +341,7 @@ void PartEdit::drumsetToggled(bool val, bool syncControls)
 
       part->undoChangeProperty(Pid::USE_DRUMSET, val);
       patch->clear();
-      const QList<MidiPatch*> pl = synti->getPatchInfo();
+      const auto& pl = synti->getPatchInfo();
       for (const MidiPatch* p : pl) {
             if (p->drum == val)
                   patch->addItem(p->name, QVariant::fromValue<void*>((void*)p));

@@ -387,7 +387,7 @@ void ScoreView::measurePopup(QContextMenuEvent* ev, Measure* obj)
       a = popup->addAction(tr("Piano Roll Editor..."));
       a->setData("pianoroll");
 
-      a = popup->addAction(tr("Staff Properties..."));
+      a = popup->addAction(tr("Staff/Part Properties..."));
       a->setData("staff-properties");
       a = popup->addAction(tr("Split Staff..."));
       a->setData("staff-split");
@@ -1928,16 +1928,17 @@ void ScoreView::cmd(const char* s)
          || cmd == "next-measure"
          || cmd == "prev-measure") {
             Element* el = score()->selection().element();
-            if (el && (el->isText())) {
+            if (el && (el->isTextBase())) {
                   score()->startCmd();
+                  const PropertyFlags pf = PropertyFlags::UNSTYLED;
                   if (cmd == "prev-chord")
-                        el->undoChangeProperty(Pid::OFFSET, el->offset() - QPointF (MScore::nudgeStep * el->spatium(), 0.0));
+                        el->undoChangeProperty(Pid::OFFSET, el->offset() - QPointF (MScore::nudgeStep * el->spatium(), 0.0), pf);
                   else if (cmd == "next-chord")
-                        el->undoChangeProperty(Pid::OFFSET, el->offset() + QPointF (MScore::nudgeStep * el->spatium(), 0.0));
+                        el->undoChangeProperty(Pid::OFFSET, el->offset() + QPointF (MScore::nudgeStep * el->spatium(), 0.0), pf);
                   else if (cmd == "prev-measure")
-                        el->undoChangeProperty(Pid::OFFSET, el->offset() - QPointF (MScore::nudgeStep10 * el->spatium(), 0.0));
+                        el->undoChangeProperty(Pid::OFFSET, el->offset() - QPointF (MScore::nudgeStep10 * el->spatium(), 0.0), pf);
                   else if (cmd == "next-measure")
-                        el->undoChangeProperty(Pid::OFFSET, el->offset() + QPointF (MScore::nudgeStep10 * el->spatium(), 0.0));
+                        el->undoChangeProperty(Pid::OFFSET, el->offset() + QPointF (MScore::nudgeStep10 * el->spatium(), 0.0), pf);
                   score()->endCmd();
                   }
             else {
@@ -2516,6 +2517,8 @@ void ScoreView::dragScoreView(QMouseEvent* ev)
 
       constraintCanvas(&dx, &dy);
 
+      TourHandler::startTour("navigate-tour");
+
       _matrix.setMatrix(_matrix.m11(), _matrix.m12(), _matrix.m13(), _matrix.m21(),
          _matrix.m22(), _matrix.m23(), _matrix.dx()+dx, _matrix.dy()+dy, _matrix.m33());
       imatrix = _matrix.inverted();
@@ -2536,6 +2539,7 @@ void ScoreView::dragScoreView(QMouseEvent* ev)
 
 void ScoreView::doDragLasso(QMouseEvent* ev)
       {
+      TourHandler::startTour("select-tour");
       QPointF p = toLogical(ev->pos());
       _score->addRefresh(lasso->canvasBoundingRect());
       QRectF r;
@@ -2937,7 +2941,7 @@ void ScoreView::adjustCanvasPosition(const Element* el, bool playBack, int staff
                         .adjusted(-border, -border, border, border);
             }
       else {
-            //find a box for the individual stave in a system
+            // find a box for the individual stave in a system
             QRectF stave = QRectF(sys->canvasBoundingRect().left(),
                                   sys->staffCanvasYpage(staff),
                                   sys->width(),
@@ -2945,12 +2949,12 @@ void ScoreView::adjustCanvasPosition(const Element* el, bool playBack, int staff
             showRect = mRect.intersected(stave).adjusted(-border, -border, border, border);
             }
 
-/*      printf("%f %f %f %f   %f %f %f %f  %d\n",
-            showRect.x(), showRect.y(), showRect.width(), showRect.height(),
-            r.x(), r.y(), r.width(), r.height(),
-            r.contains(showRect)
-            );
-  */
+/*printf("%f %f %f %f   %f %f %f %f  %d\n",
+   showRect.x(), showRect.y(), showRect.width(), showRect.height(),
+   r.x(), r.y(), r.width(), r.height(),
+   r.contains(showRect)
+   );
+*/
       // canvas is not as wide as measure, track note instead
       if (r.width() < showRect.width()) {
             showRect.setX(p.x());
@@ -4403,6 +4407,16 @@ void ScoreView::updateShadowNotes()
 Element* ScoreView::getEditElement()
       {
       return editData.element;
+      }
+
+//---------------------------------------------------------
+//   onElementDestruction
+//---------------------------------------------------------
+
+void ScoreView::onElementDestruction(Element* e)
+      {
+      if (editData.element == e)
+            editData.element = nullptr;
       }
 
 //---------------------------------------------------------

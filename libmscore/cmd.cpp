@@ -1999,6 +1999,18 @@ bool Score::processMidiInput()
                         ev.chord = false;
                   else
                         ev.chord = true;
+
+                  Element* cr = _is.lastSegment()->element(_is.track());
+                  if (cr->isChord()) {
+                        Note* n = toChord(cr)->findNote(ev.pitch);
+                        if (n) {
+                              deleteItem(n->tieBack());
+                              deleteItem(n);
+                              }
+                        if (qApp->keyboardModifiers() & Qt::ShiftModifier)
+                              ev.chord = true;
+                        }
+
                   // TODO: add shadow note instead of real note in realtime modes
                   // (note becomes real when realtime-advance triggered).
                   addMidiPitch(ev.pitch, ev.chord);
@@ -3049,7 +3061,7 @@ void Score::cmdPitchUpOctave()
       {
       Element* el = selection().element();
       if (el && (el->isArticulation() || el->isTextBase()))
-            el->undoChangeProperty(Pid::OFFSET, el->offset() + QPointF(0.0, -MScore::nudgeStep10 * el->spatium()));
+            el->undoChangeProperty(Pid::OFFSET, el->offset() + QPointF(0.0, -MScore::nudgeStep10 * el->spatium()), PropertyFlags::UNSTYLED);
       else
             upDown(true, UpDownMode::OCTAVE);
       }
@@ -3062,7 +3074,7 @@ void Score::cmdPitchDownOctave()
       {
       Element* el = selection().element();
       if (el && (el->isArticulation() || el->isTextBase()))
-            el->undoChangeProperty(Pid::OFFSET, el->offset() + QPointF(0.0, MScore::nudgeStep10 * el->spatium()));
+            el->undoChangeProperty(Pid::OFFSET, el->offset() + QPointF(0.0, MScore::nudgeStep10 * el->spatium()), PropertyFlags::UNSTYLED);
       else
             upDown(false, UpDownMode::OCTAVE);
       }

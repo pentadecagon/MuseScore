@@ -1108,25 +1108,41 @@ void RemoveStaves::redo(EditData*)
       }
 
 //---------------------------------------------------------
-//   ChangeKeySig::flip
+//   ChangeKeySig
 //---------------------------------------------------------
+
+ChangeKeySig::ChangeKeySig(KeySig* k, KeySigEvent newKeySig, bool sc, bool addEvtToStaff)
+   : keysig(k), ks(newKeySig), showCourtesy(sc), evtInStaff(addEvtToStaff)
+      {}
 
 void ChangeKeySig::flip(EditData*)
       {
-      KeySigEvent oe = keysig->keySigEvent();
-      bool sc        = keysig->showCourtesy();
+      Segment* segment = keysig->segment();
+      const int tick = segment->tick();
+      Staff* staff = keysig->staff();
+
+      const bool curEvtInStaff = (staff->currentKeyTick(tick) == tick);
+      KeySigEvent curKey = keysig->keySigEvent();
+      const bool curShowCourtesy = keysig->showCourtesy();
 
       keysig->setKeySigEvent(ks);
       keysig->setShowCourtesy(showCourtesy);
 
-      int tick = keysig->segment()->tick();
+      // Add/remove the corresponding key events, if appropriate.
+      if (evtInStaff)
+            staff->setKey(tick, ks); // replace
+      else if (curEvtInStaff)
+            staff->removeKey(tick); // if nothing to add instead, just remove.
 
-      // update keys if keysig was not generated
-      if (!keysig->generated())
-            keysig->staff()->setKey(tick, ks);
+      // If no keysig event corresponds to the key signature then this keysig
+      // is probably generated. Otherwise it is probably added manually.
+      // Set segment flags according to this, layout will change it if needed.
+      segment->setEnabled(evtInStaff);
+      segment->setHeader(!evtInStaff && segment->rtick() == 0);
 
-      showCourtesy = sc;
-      ks           = oe;
+      showCourtesy = curShowCourtesy;
+      ks           = curKey;
+      evtInStaff   = curEvtInStaff;
       keysig->score()->setLayout(tick);
       keysig->score()->setLayout(keysig->staff()->nextKeyTick(tick));
       }
@@ -1555,6 +1571,29 @@ void ChangeMStaffProperties::flip(EditData*)
       }
 
 //---------------------------------------------------------
+//   getCourtesyClefs
+//    remember clefs at the end of previous measure
+//---------------------------------------------------------
+
+std::vector<Clef*> InsertRemoveMeasures::getCourtesyClefs(Measure* m)
+      {
+      Score* score = m->score();
+      std::vector<Clef*> startClefs;
+      if (m->prev() && m->prev()->isMeasure()) {
+            Measure* prevMeasure = toMeasure(m->prev());
+            const Segment* clefSeg = prevMeasure->findSegmentR(SegmentType::Clef | SegmentType::HeaderClef, prevMeasure->ticks());
+            if (clefSeg) {
+                  for (int st = 0; st < score->nstaves(); ++st) {
+                        Element* clef = clefSeg->element(staff2track(st));
+                        if (clef->isClef())
+                              startClefs.push_back(toClef(clef));
+                        }
+                  }
+            }
+      return startClefs;
+      }
+
+//---------------------------------------------------------
 //   insertMeasures
 //---------------------------------------------------------
 
@@ -1562,6 +1601,7 @@ void InsertRemoveMeasures::insertMeasures()
       {
       Score* score = fm->score();
       QList<Clef*> clefs;
+      std::vector<Clef*> prevMeasureClefs;
       QList<KeySig*> keys;
       Segment* fs = 0;
       Segment* ls = 0;
@@ -1570,7 +1610,7 @@ void InsertRemoveMeasures::insertMeasures()
             fs = toMeasure(fm)->first();
             ls = toMeasure(lm)->last();
             for (Segment* s = fs; s && s != ls; s = s->next1()) {
-                  if (!(s->segmentType() & (SegmentType::Clef | SegmentType::KeySig)))
+                  if (!s->enabled() || !(s->segmentType() & (SegmentType::Clef | SegmentType::HeaderClef | SegmentType::KeySig)))
                         continue;
                   for (int track = 0; track < score->ntracks(); track += VOICES) {
                         Element* e = s->element(track);
@@ -1582,6 +1622,7 @@ void InsertRemoveMeasures::insertMeasures()
                               keys.append(toKeySig(e));
                         }
                   }
+            prevMeasureClefs = getCourtesyClefs(toMeasure(fm));
             }
       score->measures()->insert(fm, lm);
 
@@ -1597,6 +1638,8 @@ void InsertRemoveMeasures::insertMeasures()
                               }
                         }
                   }
+            for (Clef* clef : prevMeasureClefs)
+                  clef->staff()->setClef(clef);
             for (Clef* clef : clefs)
                   clef->staff()->setClef(clef);
             for (KeySig* key : keys)
@@ -1652,11 +1695,7 @@ void InsertRemoveMeasures::removeMeasures()
                   if (!systemList.contains(system)) {
                         systemList.push_back(system);
                         }
-                  auto i = std::find(system->measures().begin(), system->measures().end(), mb);
-                  if (i != system->measures().end()) {
-                        (*i)->setParent(0);
-                        system->measures().erase(i);
-                        }
+                  system->removeMeasure(mb);
                   }
             if (mb == fm)
                   break;
@@ -1681,8 +1720,18 @@ void InsertRemoveMeasures::removeMeasures()
                               }
                         }
                   }
+
+            // remember clefs at the end of previous measure
+            const auto clefs = getCourtesyClefs(toMeasure(fm));
+
             if (score->firstMeasure())
                   score->insertTime(tick1, -(tick2 - tick1));
+
+            // Restore clefs that were backed up. Events for them could be lost
+            // as a result of the recent insertTime() call.
+            for (Clef* clef : clefs)
+                  clef->staff()->setClef(clef);
+
             for (Spanner* sp : score->unmanagedSpanners()) {
                   if ((sp->tick() >= tick1 && sp->tick() < tick2) || (sp->tick2() >= tick1 && sp->tick2() < tick2))
                         sp->removeUnmanaged();

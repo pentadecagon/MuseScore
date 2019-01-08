@@ -172,10 +172,9 @@ void TrackList::append(Element* e)
                                           break;
                                           }
                                    }
-                              if (akkumulateChord && back()->isChord()) {
+                              if (akkumulateChord && !empty() && back()->isChord()) {
                                     Chord* bc   = toChord(back());
-                                    Fraction du = bc->duration();
-                                    du += bc->duration();
+                                    const Fraction du = bc->duration() + chord->duration();
                                     bc->setDuration(du);
 
                                     // forward ties
@@ -558,12 +557,12 @@ bool TrackList::write(Score* score, int tick) const
                   Segment* seg;
                   if (remains == m->len() && m->tick() > 0) {
                         Measure* pm = m->prevMeasure();
-                        seg = pm->undoGetSegment(SegmentType::Clef, pm->len());
+                        seg = pm->getSegment(SegmentType::Clef, pm->len());
                         }
                   else if (remains != m->len())
-                        seg = m->undoGetSegment(SegmentType::Clef, m->len() - remains);
+                        seg = m->getSegment(SegmentType::Clef, m->len() - remains);
                   else
-                        seg = m->undoGetSegmentR(SegmentType::HeaderClef, 0);
+                        seg = m->getSegmentR(SegmentType::HeaderClef, 0);
                   Element* ne = e->clone();
                   ne->setScore(score);
                   ne->setTrack(_track);
@@ -575,7 +574,7 @@ bool TrackList::write(Score* score, int tick) const
                   // add the element in its own segment;
                   // but KeySig has to be at start of (current) measure
 
-                  Segment* seg = m->undoGetSegment(Segment::segmentType(e->type()), e->isKeySig() ? Fraction() : m->len() - remains);
+                  Segment* seg = m->getSegment(Segment::segmentType(e->type()), e->isKeySig() ? Fraction() : m->len() - remains);
                   Element* ne = e->clone();
                   ne->setScore(score);
                   ne->setTrack(_track);
@@ -726,8 +725,16 @@ bool ScoreRange::write(Score* score, int tick) const
 
 void ScoreRange::fill(const Fraction& f)
       {
+      const Fraction oldDuration = duration();
+      const int oldEndTick = _first->tick() + oldDuration.ticks();
       for (auto t : tracks)
             t->appendGap(f);
+
+      const int diff = (duration() - oldDuration).ticks();
+      for (Spanner* sp : spanner) {
+            if (sp->tick2() >= oldEndTick && sp->tick() < oldEndTick)
+                  sp->setTicks(sp->ticks() + diff);
+            }
       }
 
 //---------------------------------------------------------

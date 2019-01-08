@@ -25,6 +25,7 @@
 #include "fontStyleSelect.h"
 #include "scoreview.h"
 #include "resetButton.h"
+#include "tourhandler.h"
 
 namespace Ms {
 
@@ -35,9 +36,10 @@ namespace Ms {
 InspectorBase::InspectorBase(QWidget* parent)
    : QWidget(parent)
       {
-      setObjectName("inspector");
+      setObjectName("InspectorBase");
       setAccessibleName(tr("Inspector"));
       inspector = static_cast<Inspector*>(parent);
+      setParent(parent);
       _layout    = new QVBoxLayout(this);
       _layout->setSpacing(0);
       _layout->setContentsMargins(0, 10, 0, 0);
@@ -384,7 +386,13 @@ void InspectorBase::valueChanged(int idx, bool reset)
       const InspectorItem& ii = iList[idx];
       Pid id       = ii.t;
       QVariant val2 = getValue(ii);                   // get new value from UI
-      Score* score  = inspector->element()->score();
+      Element* iElement = inspector->element();
+      Score* score  = iElement->score();
+
+      if (ii.t == Pid::AUTOPLACE)
+            TourHandler::startTour("autoplace-tour");
+      else
+            TourHandler::startTour("inspector-tour");
 
       score->startCmd();
       for (Element* e : *inspector->el()) {
@@ -413,6 +421,14 @@ void InspectorBase::valueChanged(int idx, bool reset)
       checkDifferentValues(ii);
       score->endCmd();
       inspector->setInspectorEdit(false);
+
+      if (iElement != inspector->element()) {
+            // Something changed in selection as a result of value change.
+            recursion = false;
+            emit elementChanged();
+            return;
+            }
+
       postInit();
 
       // a subStyle change may change several other values:

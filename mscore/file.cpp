@@ -153,7 +153,7 @@ static QString createDefaultFileName(QString fn)
 
 static bool readScoreError(const QString& name, Score::FileError error, bool ask)
       {
-printf("<%s> %d\n", qPrintable(name), int(error));
+//printf("<%s> %d\n", qPrintable(name), int(error));
       QString msg = QObject::tr("Cannot read file %1:\n").arg(name);
       QString detailedMsg;
       bool canIgnore = false;
@@ -2044,23 +2044,31 @@ bool MuseScore::savePdf(const QString& saveName)
 
 bool MuseScore::savePdf(Score* cs_, const QString& saveName)
       {
-      QPdfWriter printerDev(saveName);
-      return savePdf(cs_, printerDev);
+      QPrinter printer;
+      printer.setOutputFileName(saveName);
+      return savePdf(cs_, printer);
       }
 
-bool MuseScore::savePdf(Score* cs_, QPdfWriter& pdfWriter)
+bool MuseScore::savePdf(Score* cs_, QPrinter& printer)
       {
       cs_->setPrinting(true);
       MScore::pdfPrinting = true;
 
-      pdfWriter.setResolution(preferences.getInt(PREF_EXPORT_PDF_DPI));
+      printer.setResolution(preferences.getInt(PREF_EXPORT_PDF_DPI));
       QSizeF size(cs_->styleD(Sid::pageWidth), cs_->styleD(Sid::pageHeight));
-      QPageSize ps(QPageSize::id(size, QPageSize::Inch));
-      pdfWriter.setPageSize(ps);
-      pdfWriter.setPageOrientation(size.width() > size.height() ? QPageLayout::Landscape : QPageLayout::Portrait);
+      printer.setPaperSize(size, QPrinter::Inch);
+      printer.setFullPage(true);
+      printer.setColorMode(QPrinter::Color);
+#if defined(Q_OS_MAC)
+      printer.setOutputFormat(QPrinter::NativeFormat);
+#else
+      printer.setOutputFormat(QPrinter::PdfFormat);
+#endif
 
-      pdfWriter.setCreator("MuseScore Version: " VERSION);
-      if (!pdfWriter.setPageMargins(QMarginsF()))
+      printer.setPageOrientation(size.width() > size.height() ? QPageLayout::Landscape : QPageLayout::Portrait);
+
+      printer.setCreator("MuseScore Version: " VERSION);
+      if (!printer.setPageMargins(QMarginsF()))
             qDebug("unable to clear printer margins");
 
       QString title = cs_->metaTag("workTitle");
@@ -2072,27 +2080,27 @@ bool MuseScore::savePdf(Score* cs_, QPdfWriter& pdfWriter)
                   partname = cs_->title(); // fall back to excerpt's tab title
             title += " - " + partname;
             }
-      pdfWriter.setTitle(title); // set PDF's meta data for Title
+      printer.setDocName(title); // set PDF's meta data for Title
 
       QPainter p;
-      if (!p.begin(&pdfWriter))
+      if (!p.begin(&printer))
             return false;
       p.setRenderHint(QPainter::Antialiasing, true);
       p.setRenderHint(QPainter::TextAntialiasing, true);
 
-      p.setViewport(QRect(0.0, 0.0, size.width() * pdfWriter.logicalDpiX(),
-         size.height() * pdfWriter.logicalDpiY()));
+      p.setViewport(QRect(0.0, 0.0, size.width() * printer.logicalDpiX(),
+         size.height() * printer.logicalDpiY()));
       p.setWindow(QRect(0.0, 0.0, size.width() * DPI, size.height() * DPI));
 
       double pr = MScore::pixelRatio;
-      MScore::pixelRatio = DPI / pdfWriter.logicalDpiX();
+      MScore::pixelRatio = DPI / printer.logicalDpiX();
 
       const QList<Page*> pl = cs_->pages();
       int pages = pl.size();
       bool firstPage = true;
       for (int n = 0; n < pages; ++n) {
             if (!firstPage)
-                  pdfWriter.newPage();
+                  printer.newPage();
             firstPage = false;
             cs_->print(&p, n);
             }
@@ -3009,6 +3017,8 @@ bool MuseScore::saveSvg(Score* score, QIODevice* device, int pageNumber)
 
 static QPixmap createThumbnail(const QString& name)
       {
+      if (!(name.endsWith(".mscx") || name.endsWith(".mscz")))
+            return QPixmap();
       MasterScore* score = new MasterScore(MScore::defaultStyle());
       Score::FileError error = readScore(score, name, true);
       if (error != Score::FileError::FILE_NO_ERROR || !score->firstMeasure()) {
@@ -3045,7 +3055,7 @@ QPixmap MuseScore::extractThumbnail(const QString& name)
 //---------------------------------------------------------
 //   saveMetadataJSON
 //---------------------------------------------------------
-      
+
 bool MuseScore::saveMetadataJSON(Score* score, const QString& name)
       {
       QFile f(name);
@@ -3058,7 +3068,7 @@ bool MuseScore::saveMetadataJSON(Score* score, const QString& name)
       f.close();
       return true;
       }
-      
+
 QJsonObject MuseScore::saveMetadataJSON(Score* score)
       {
       auto boolToString = [](bool b) { return b ? "true" : "false"; };
@@ -3165,6 +3175,7 @@ QJsonObject MuseScore::saveMetadataJSON(Score* score)
             jsonPart.insert("hasPitchedStaff", boolToString(p->hasPitchedStaff()));
             jsonPart.insert("hasTabStaff", boolToString(p->hasTabStaff()));
             jsonPart.insert("hasDrumStaff", boolToString(p->hasDrumStaff()));
+            jsonPart.insert("isVisible", boolToString(p->show()));
             jsonPartsArray.append(jsonPart);
             }
       json.insert("parts", jsonPartsArray);
@@ -3182,23 +3193,23 @@ QJsonObject MuseScore::saveMetadataJSON(Score* score)
 //---------------------------------------------------------
 //   exportMp3AsJSON
 //---------------------------------------------------------
-      
+
 bool MuseScore::exportMp3AsJSON(const QString& inFilePath, const QString& outFilePath)
       {
       std::unique_ptr<MasterScore> score(mscore->readScore(inFilePath));
       if (!score)
             return false;
-      
+
       //export score audio
       QByteArray mp3Data;
       QBuffer mp3Device(&mp3Data);
       mp3Device.open(QIODevice::ReadWrite);
       bool dummy = false;
       mscore->saveMp3(score.get(), &mp3Device, dummy);
-      
+
       QJsonObject jsonForMedia;
       jsonForMedia["mp3"] = QString::fromLatin1(mp3Data.toBase64());
-      
+
       QJsonDocument jsonDoc(jsonForMedia);
       const QString& jsonPath{outFilePath};
       QFile file(jsonPath);
@@ -3207,17 +3218,34 @@ bool MuseScore::exportMp3AsJSON(const QString& inFilePath, const QString& outFil
       file.close();
       return true;
       }
-      
+
+QJsonValue MuseScore::exportPdfAsJSON(Score* score)
+      {
+      QPrinter printer;
+      auto tempPdfFileName = "/tmp/MUTempPdf.pdf";
+      printer.setOutputFileName(tempPdfFileName);
+      mscore->savePdf(score, printer);
+      QFile tempPdfFile(tempPdfFileName);
+      QByteArray pdfData;
+      if (tempPdfFile.open(QIODevice::ReadWrite)) {
+            pdfData = tempPdfFile.readAll();
+            tempPdfFile.close();
+            tempPdfFile.remove();
+            }
+
+      return QString::fromLatin1(pdfData.toBase64());
+      }
+
 //---------------------------------------------------------
 //   exportAllMediaFiles
 //---------------------------------------------------------
-      
+
 bool MuseScore::exportAllMediaFiles(const QString& inFilePath, const QString& outFilePath)
       {
       std::unique_ptr<MasterScore> score(mscore->readScore(inFilePath));
       if (!score)
             return false;
-      
+
       score->switchToPageMode();
 
       //// JSON specification ///////////////////////////
@@ -3230,7 +3258,7 @@ bool MuseScore::exportAllMediaFiles(const QString& inFilePath, const QString& ou
       //jsonForMedia["mxml"] = mxmlJson;
       //jsonForMedia["metadata"] = mdJson;
       ///////////////////////////////////////////////////
-      
+
       QJsonObject jsonForMedia;
       bool res = true;
 
@@ -3255,7 +3283,7 @@ bool MuseScore::exportAllMediaFiles(const QString& inFilePath, const QString& ou
       jsonForMedia["pngs"] = pngsJsonArray;
       jsonForMedia["svgs"] = svgsJsonArray;
       }
-      
+
       //export score .spos
       QByteArray partDataPos;
       QBuffer partPosDevice(&partDataPos);
@@ -3271,12 +3299,7 @@ bool MuseScore::exportAllMediaFiles(const QString& inFilePath, const QString& ou
       jsonForMedia["mposXML"] = QString::fromLatin1(partDataPos.toBase64());
 
       //export score pdf
-      QByteArray pdfData;
-      QBuffer pdfDevice(&pdfData);
-      pdfDevice.open(QIODevice::ReadWrite);
-      QPdfWriter writer(&pdfDevice);
-      res &= mscore->savePdf(score.get(), writer);
-      jsonForMedia["pdf"] = QString::fromLatin1(pdfData.toBase64());
+      jsonForMedia["pdf"] = exportPdfAsJSON(score.get());
 
       //export score midi
       QByteArray midiData;
@@ -3300,10 +3323,10 @@ bool MuseScore::exportAllMediaFiles(const QString& inFilePath, const QString& ou
       QFile file(jsonPath);
       if (!file.open(QIODevice::WriteOnly))
             return false;
-      
+
       file.write(jsonDoc.toJson(QJsonDocument::Compact));
       file.close();
-      
+
       return res;
       }
 

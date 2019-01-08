@@ -1397,6 +1397,53 @@ bool readNoteProperties206(Note* note, XmlReader& e)
       }
 
 //---------------------------------------------------------
+//   readTextPropertyStyle206
+//    This reads only the 'style' tag, so that it can be read
+//    before setting anything else.
+//---------------------------------------------------------
+
+static bool readTextPropertyStyle206(XmlReader& e, TextBase* t, Element* be, QStringRef elementName)
+      {
+      QString s;
+      if (e.readAheadAvailable()) {
+            e.performReadAhead([&s, &elementName](QIODevice& dev) {
+                  const QString closeTag = QString("</").append(elementName.toString()).append(">");
+                  QByteArray arrLine = dev.readLine();
+                  while (!arrLine.isEmpty()) {
+                        QString line(arrLine);
+                        if (line.contains("<style>")) {
+                              QRegExp re("<style>([^<]+)</style>");
+                              if (re.indexIn(line) > -1)
+                                    s = re.cap(1);
+                              return;
+                              }
+                        else if (line.contains(closeTag)) {
+                              return;
+                              }
+
+                        arrLine = dev.readLine();
+                        }
+                  });
+            }
+      else
+            return false;
+
+      if (s.isEmpty())
+            return true;
+
+      if (!be->isTuplet()) {      // Hack
+            Tid ss;
+            ss = e.lookupUserTextStyle(s);
+            if (ss == Tid::TEXT_STYLES)
+                  ss = textStyleFromName(s);
+            if (ss != Tid::TEXT_STYLES)
+                  t->initTid(ss);
+            }
+
+      return true;
+      }
+
+//---------------------------------------------------------
 //   readTextProperties206
 //---------------------------------------------------------
 
@@ -1404,17 +1451,7 @@ static bool readTextProperties206(XmlReader& e, TextBase* t, Element* be)
       {
       const QStringRef& tag(e.name());
       if (tag == "style") {
-            QString s = e.readElementText();
-            if (!be->isTuplet()) {      // Hack
-                  Tid ss;
-                  QPointF p = t->offset();            // offset maybe already set, setting style resets it
-                  ss = e.lookupUserTextStyle(s);
-                  if (ss == Tid::TEXT_STYLES)
-                        ss = textStyleFromName(s);
-                  if (ss != Tid::TEXT_STYLES)
-                        t->initTid(ss);
-                  t->setOffset(p);
-                  }
+            e.skipCurrentElement(); // read in readTextPropertyStyle206
             }
       else if (tag == "foregroundColor")  // same as "color" ?
             e.skipCurrentElement();
@@ -1491,6 +1528,7 @@ static bool readTextProperties206(XmlReader& e, TextBase* t, Element* be)
 
 static void readText206(XmlReader& e, TextBase* t, Element* be)
       {
+      readTextPropertyStyle206(e, t, be, e.name());
       while (e.readNextStartElement()) {
             if (!readTextProperties206(e, t, be))
                   e.unknown();
@@ -1503,6 +1541,7 @@ static void readText206(XmlReader& e, TextBase* t, Element* be)
 
 static void readTempoText(TempoText* t, XmlReader& e)
       {
+      readTextPropertyStyle206(e, t, t, e.name());
       while (e.readNextStartElement()) {
             const QStringRef& tag(e.name());
             if (tag == "tempo")
@@ -1527,6 +1566,7 @@ static void readTempoText(TempoText* t, XmlReader& e)
 
 static void readMarker(Marker* m, XmlReader& e)
       {
+      readTextPropertyStyle206(e, m, m, e.name());
       Marker::Type mt = Marker::Type::SEGNO;
 
       while (e.readNextStartElement()) {
@@ -1548,6 +1588,7 @@ static void readMarker(Marker* m, XmlReader& e)
 
 static void readDynamic(Dynamic* d, XmlReader& e)
       {
+      readTextPropertyStyle206(e, d, d, e.name());
       while (e.readNextStartElement()) {
             const QStringRef& tag = e.name();
             if (tag == "subtype")
@@ -1991,6 +2032,7 @@ bool readChordProperties206(XmlReader& e, Chord* ch)
             tremolo->setTrack(ch->track());
             tremolo->read(e);
             tremolo->setParent(ch);
+            tremolo->setDurationType(ch->durationType());
             ch->setTremolo(tremolo);
             }
       else if (tag == "tickOffset")       // obsolete
@@ -2406,6 +2448,8 @@ Element* readArticulation(ChordRest* cr, XmlReader& e)
       SymId sym = SymId::fermataAbove;          // default -- backward compatibility (no type = ufermata in 1.2)
       ArticulationAnchor anchor  = ArticulationAnchor::TOP_STAFF;
       Direction direction = Direction::AUTO;
+      double timeStretch = 0.0;
+      bool useDefaultPlacement = true;
 
       while (e.readNextStartElement()) {
             const QStringRef& tag(e.name());
@@ -2455,6 +2499,8 @@ Element* readArticulation(ChordRest* cr, XmlReader& e)
                                           sym       = al[i].id;
                                           bool up   = al[i].up;
                                           direction = up ? Direction::UP : Direction::DOWN;
+                                          if ((direction == Direction::DOWN) != (cr->track() & 1))
+                                                useDefaultPlacement = false;
                                           break;
                                           }
                                     }
@@ -2475,7 +2521,6 @@ Element* readArticulation(ChordRest* cr, XmlReader& e)
                         case SymId::fermataVeryLongAbove:
                         case SymId::fermataVeryLongBelow:
                               el = new Fermata(sym, cr->score());
-                              setFermataPlacement(el, anchor, direction);
                               break;
                         default:
                               el = new Articulation(sym, cr->score());
@@ -2484,32 +2529,21 @@ Element* readArticulation(ChordRest* cr, XmlReader& e)
                         };
                   }
             else if (tag == "anchor") {
-                  if (!el)
+                  useDefaultPlacement = false;
+                  if (!el || el->isFermata())
                         anchor = ArticulationAnchor(e.readInt());
-                  else {
-                        if (el->isFermata()) {
-                              anchor = ArticulationAnchor(e.readInt());
-                              setFermataPlacement(el, anchor, direction);
-                              }
-                        else
-                              el->readProperties(e);
-                        }
+                  else
+                        el->readProperties(e);
                   }
             else  if (tag == "direction") {
-                  if (!el)
+                  useDefaultPlacement = false;
+                  if (!el || el->isFermata())
                         direction = toDirection(e.readElementText());
-                  else {
-                        if (!el->isFermata())
-                              el->readProperties(e);
-                        }
+                  else
+                        el->readProperties(e);
                   }
             else if (tag == "timeStretch") {
-                  if (el && el->isFermata())
-                        el->setProperty(Pid::TIME_STRETCH ,e.readDouble());
-                  else {
-                        qDebug("line %lld: read206: skipping <timeStretch>", e.lineNumber());
-                        e.skipCurrentElement();
-                        }
+                  timeStretch = e.readDouble();
                   }
             else {
                   if (!el) {
@@ -2520,9 +2554,15 @@ Element* readArticulation(ChordRest* cr, XmlReader& e)
                   }
             }
       // Special case for "no type" = ufermata, with missing subtype tag
-      if (!el) {
+      if (!el)
             el = new Fermata(sym, cr->score());
-            setFermataPlacement(el, anchor, direction);
+      if (el->isFermata()) {
+            if (timeStretch != 0.0)
+                  el->setProperty(Pid::TIME_STRETCH, timeStretch);
+            if (useDefaultPlacement)
+                  el->setPlacement(cr->track() & 1 ? Placement::BELOW : Placement::ABOVE);
+            else
+                  setFermataPlacement(el, anchor, direction);
             }
       el->setTrack(cr->track());
       return el;
@@ -3697,7 +3737,7 @@ static bool readScore(Score* score, XmlReader& e)
                   ms->setShowOmr(false);
             ms->rebuildMidiMapping();
             ms->updateChannel();
-            ms->createPlayEvents();
+ //           ms->createPlayEvents();
             }
       return true;
       }
