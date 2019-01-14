@@ -1030,6 +1030,7 @@ void Rest::AddToProto(MusicOCR::Staff* mstaff, double mag) const {
           }
     else {
             mnote->set_name("Rest");
+            mnote->set_piece_error("Bad Rest duration");
           }
       }
 }

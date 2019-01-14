@@ -3299,19 +3299,32 @@ void Note::undoUnlink()
       for (Element* e : _el)
             e->undoUnlink();
       }
+using MusicOCR::Ref1;
+using MusicOCR::Ref2;
 
 void Note::AddToProto(MusicOCR::Staff* mstaff, double mag) const {
     auto* mnote = mstaff->add_piece();
-    mnote->set_name("Note");
     mnote->set_line(line());
     mnote->set_x((pagePos().x() + noteheadCenterX())*mag);
     mnote->set_y(pagePos().y() * mag);
     mnote->set_duration((int)chord()->durationType().type());
     mnote->set_dots(chord()->dots());
-    mnote->set_up(chord()->up());
-    if (mnote->duration() <= 2 || ! chord()->stem()) { // whole note
-          mnote->set_up(true);
+    if (mnote->duration() < 2 || mnote->duration() > 8) {
+          mnote->set_piece_error("Note: Bad duration");
+          return;
           }
-    }
-
+    const bool up = chord()->up() || mnote->duration() <= 2;
+    if (mnote->duration() > 2 && ! chord()->stem()) {
+          mnote->set_piece_error("No stem");
+          return;
+          }
+    if (up) {
+          mnote->set_ref1(Ref1::ERef1(Ref1::NoteWhole + mnote->duration() - (int)TDuration::DurationType::V_WHOLE));
+          mnote->set_ref2(Ref2::NoteUp);
+          }
+    else {
+          mnote->set_ref1(Ref1::ERef1(Ref1::NoteDown_2 + mnote->duration() - (int)TDuration::DurationType::V_HALF));
+          mnote->set_ref2(Ref2::NoteDown);
+          }
+      }
 } // namespace

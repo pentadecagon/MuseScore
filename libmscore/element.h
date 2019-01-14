@@ -17,7 +17,7 @@
 #include "fraction.h"
 #include "scoreElement.h"
 #include "shape.h"
-#include "proto/music-ocr-pieces.pb.h"
+#include "MusicOCR/proto/music-ocr-pieces.pb.h"
 
 namespace Ms {
 

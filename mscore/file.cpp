@@ -80,6 +80,7 @@
 #include "extension.h"
 #include "tourhandler.h"
 #include <fstream>
+#include "../../main/MusicOCR/staff.hh"
 #ifdef OMR
 #include "omr/omr.h"
 #include "omr/omrpage.h"
@@ -496,7 +497,7 @@ MasterScore* MuseScore::getNewFile()
       {
       if (!newWizard)
             newWizard = new NewWizard(this);
-	  else {
+     else {
             newWizard->updateValues();
             newWizard->restart();
             }
@@ -2545,7 +2546,7 @@ static QRect trim(QImage source, int margin)
 //---------------------------------------------------------
 
 const SysStaff* FindSysStaff(const Element* p) {
-    const MeasureBase* m = p->findMeasureBase();
+//    const MeasureBase* m = p->findMeasureBase();
     const System* sys = nullptr;
         for (auto* x = p; x; x = x->parent()) {
             if (x->isSystem()) {
@@ -2601,6 +2602,7 @@ static void savePieces(const QList<Element*> & vel, const QString& fname, double
                         }
                   }
             }
+      NormalizeLayout(&layout);
       std::ofstream ost((fname+".pb").toStdString().c_str(),ios::binary);
       ost << layout.SerializeAsString();
       cerr << "Found Staff: " << layout.staff_size() << endl;

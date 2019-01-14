@@ -346,7 +346,19 @@ void Accidental::AddToProto(MusicOCR::Staff* mstaff, double mag) const {
     for (const SymElement& e : el) {
         auto* piece = mstaff->add_piece();
         auto bbox = symBbox(e.sym);
-        piece->set_name(Sym::id2name(e.sym));
+        switch(e.sym) {
+              case SymId::accidentalFlat:
+                    piece->set_ref2(MusicOCR::Ref2::AccFlat);
+                    break;
+              case SymId::accidentalSharp:
+                    piece->set_ref2(MusicOCR::Ref2::AccSharp);
+                    break;
+              case SymId::accidentalNatural:
+                    piece->set_ref2(MusicOCR::Ref2::AccNat);
+                    break;
+              default:
+                    piece->set_name(Sym::id2name(e.sym));
+              }
         piece->set_line(xnote->line());
         piece->set_x((pagePos().x() + e.x + bbox.width() * 0.5) * mag);
         piece->set_y((pagePos().y() + bbox.y() + bbox.height() * 0.5) * mag);
