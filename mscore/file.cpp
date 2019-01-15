@@ -2563,6 +2563,7 @@ static void savePieces(const QList<Element*> & vel, const QString& fname, double
       std::map<const SysStaff*, MusicOCR::Staff*> m;
       MusicOCR::Layout layout;
       for (const Element* el : vel) {
+            if (!el->visible()) continue;
             if (const StaffLines* stafflines = dynamic_cast<const StaffLines*>(el)) {
                   const SysStaff* ss = FindSysStaff(stafflines);
                   CHECK(ss);
@@ -2579,6 +2580,7 @@ static void savePieces(const QList<Element*> & vel, const QString& fname, double
             }
       static const string ignore[] = {"Text", "Image", "Page", "VBox", "LayoutBreak"};
       for (const Element* p : vel) {
+            if (!p->visible()) continue;
             if (!dynamic_cast<const StaffLines*>(p)) {
                   auto* ss = FindSysStaff(p);
                   if (!ss) {
