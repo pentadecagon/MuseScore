@@ -11,6 +11,7 @@
 //=============================================================================
 
 #include "element.h"
+#include "music-ocr-pieces.pb.h"
 
 namespace Ms {
 
@@ -32,6 +33,7 @@ class StaffLines final : public Element {
       virtual void draw(QPainter*) const override;
       virtual QPointF pagePos() const override;    ///< position in page coordinates
       virtual QPointF canvasPos() const override;  ///< position in page coordinates
+      void updateStaff(MusicOCR::Staff* staff) const;
 
       QVector<QLineF>& getLines() { return lines; }
       Measure* measure() const { return (Measure*)parent(); }

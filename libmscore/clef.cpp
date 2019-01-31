@@ -230,6 +230,31 @@ void Clef::draw(QPainter* painter) const
       drawSymbol(symId, painter);
       }
 
+void Clef::AddToProto(MusicOCR::Staff* mstaff, double mag) const {
+    if (symId == SymId::noSym || (staff() && !staff()->staffType(tick())->genClef()))
+          return;
+     auto center = symBbox(symId).center() + pagePos();
+    auto* piece = mstaff->add_piece();
+    piece->set_line(ClefInfo::line(clefType()));
+    piece->set_x(center.x() * mag);
+    piece->set_y(pagePos().y() * mag);
+    const string name = Sym::id2name(symId);
+    if ( name.substr(0, 5) == "gClef") {
+            piece->set_ref1(MusicOCR::Ref1::GClef);
+          }
+    else if ( name.substr(0, 5) == "fClef") {
+          piece->set_ref1(MusicOCR::Ref1::FClef);
+        }
+    else if ( name.substr(0, 5) == "cClef") {
+          piece->set_ref1(MusicOCR::Ref1::CClef);
+        }
+    else {
+          piece->set_name(name);
+          piece->set_piece_error("Bad Clef: " + name);
+          }
+}
+
+
 //---------------------------------------------------------
 //   acceptDrop
 //---------------------------------------------------------
@@ -540,6 +565,7 @@ void Clef::clear()
       setbbox(QRectF());
       symId = SymId::noSym;
       }
+
 
 }
 

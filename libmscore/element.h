@@ -17,6 +17,7 @@
 #include "fraction.h"
 #include "scoreElement.h"
 #include "shape.h"
+#include "MusicOCR/proto/music-ocr-pieces.pb.h"
 
 namespace Ms {
 
@@ -458,6 +459,12 @@ class Element : public ScoreElement {
       void autoplaceSegmentElement(qreal minDistance);      // helper function
       void autoplaceMeasureElement(qreal minDistance);
       qreal styleP(Sid idx) const;
+      virtual void AddToProto(MusicOCR::Staff* mstaff, double mag) const {
+              auto* piece = mstaff->add_piece();
+              piece->set_name(name());
+              piece->set_x((pagePos().x() + bbox().left() + bbox().width() * 0.5) * mag);
+              piece->set_y((pagePos().y() + bbox().top() + bbox().height() * 0.5) * mag);
+          }
       };
 
 //-----------------------------------------------------------------------------

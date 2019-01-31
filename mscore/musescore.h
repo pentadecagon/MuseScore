@@ -724,7 +724,7 @@ class MuseScore : public QMainWindow, public MuseScoreCore {
       bool saveMp3(Score*, QIODevice*, bool& wasCanceled);
       bool saveSvg(Score*, const QString& name);
       bool saveSvg(Score*, QIODevice*, int pageNum = 0);
-      bool savePng(Score*, QIODevice*, int pageNum = 0);
+      bool savePng(Score*, QIODevice*,  const QString& name, int pageNum = 0);
       bool savePng(Score*, const QString& name);
       bool saveMidi(Score*, const QString& name);
       bool saveMidi(Score*, QIODevice*);

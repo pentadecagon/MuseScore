@@ -144,3 +144,5 @@ if (NOT MSVC)
    ADD_DEPENDENCIES(libmscore mops1)
    ADD_DEPENDENCIES(libmscore mops2)
 endif (NOT MSVC)
+
+target_link_libraries(libmscore MusicOcrPiecesProto)

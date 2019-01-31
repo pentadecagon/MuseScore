@@ -187,6 +187,7 @@ class Clef final : public Element {
       virtual Element* prevSegmentElement() override;
       QString accessibleInfo() const override;
       void clear();
+      void AddToProto(MusicOCR::Staff* mstaff, double mag) const override;
       };
 
 }     // namespace Ms

@@ -126,6 +126,7 @@ class TimeSig final : public Element {
       virtual Element* nextSegmentElement();
       virtual Element* prevSegmentElement();
       virtual QString accessibleInfo() const override;
+      virtual void AddToProto(MusicOCR::Staff* mstaff, double mag) const override;
       };
 
 }     // namespace Ms

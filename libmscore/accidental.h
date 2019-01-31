@@ -119,6 +119,7 @@ class Accidental final : public Element {
       static bool isMicrotonal(AccidentalType t)  { return t > AccidentalType::FLAT2; }
 
       QString accessibleInfo() const override;
+      void AddToProto(MusicOCR::Staff* mstaff, double mag) const override;
       };
 
 extern AccidentalVal sym2accidentalVal(SymId id);

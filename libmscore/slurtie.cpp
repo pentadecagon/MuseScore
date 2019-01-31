@@ -588,5 +588,25 @@ void SlurTie::reset()
       undoResetProperty(Pid::LINE_TYPE);
       }
 
+void SlurTieSegment::AddToProto(MusicOCR::Staff* mstaff, double mag) const {
+      auto p1 = pagePos() + ups(Grip::START).p;
+      auto p2 = pagePos() + ups(Grip::END).p;
+
+      auto* piece1 = mstaff->add_piece();
+      piece1->set_x(p1.x() * mag);
+      piece1->set_y(p1.y() * mag);
+
+      auto* piece2 = mstaff->add_piece();
+      piece2->set_x(p2.x() * mag);
+      piece2->set_y(p2.y() * mag);
+      if (slurTie()->up()) {
+            piece1->set_ref1(MusicOCR::Ref1::SlurStartUp);
+            piece2->set_ref1(MusicOCR::Ref1::SlurEndUp);
+            }
+      else {
+            piece1->set_ref1(MusicOCR::Ref1::SlurStartDown);
+            piece2->set_ref1(MusicOCR::Ref1::SlurEndDown);
+            }
+    }
 }
 

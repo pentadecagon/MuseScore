@@ -101,6 +101,7 @@ class Rest : public ChordRest {
       virtual QString accessibleInfo() const override;
       virtual QString screenReaderInfo() const override;
       Shape shape() const override;
+      virtual void AddToProto(MusicOCR::Staff* mstaff, double mag) const override;
       };
 
 }     // namespace Ms

@@ -62,6 +62,8 @@ class BarLine final : public Element {
       mutable qreal y1;
       mutable qreal y2;
       ElementList _el;        ///< fermata or other articulations
+      bool _go_up = false; // true if the barline connects to the next staff upwards
+      mutable bool _go_down = false; // true if the barline connects downwards
 
       void getY() const;
       void drawDots(QPainter* painter, qreal x) const;
@@ -139,6 +141,7 @@ class BarLine final : public Element {
       virtual QString accessibleExtraInfo() const override;
 
       static const std::vector<BarLineTableItem> barLineTable;
+      virtual void AddToProto(MusicOCR::Staff* mstaff, double mag) const override;
       };
 }     // namespace Ms
 

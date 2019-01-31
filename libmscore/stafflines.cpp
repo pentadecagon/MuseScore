@@ -16,6 +16,7 @@
 #include "score.h"
 #include "stafftype.h"
 #include "staff.h"
+#include "glog/logging.h"
 
 // Anatomy of StaffLines:
 //
@@ -132,6 +133,35 @@ void StaffLines::draw(QPainter* painter) const
       painter->setPen(QPen(curColor(), lw, Qt::SolidLine, Qt::FlatCap));
       painter->drawLines(lines);
       }
+
+double xmin(double x, double y) { return x < y ? x : y; }
+double xmax(double x, double y) { return x > y ? x : y; }
+
+void StaffLines::updateStaff(MusicOCR::Staff* staff) const
+{
+    CHECK_GE(lines.size(), 1);
+    const auto& line0 = lines[0];
+    CHECK_EQ(line0.y1(), line0.y2());
+    const  auto p = pagePos();
+    const double y0 = line0.y1() + p.y();
+//    cerr << "FOund staff, x1=" << line0.x1() << " x2=" << line0.x2() << " p.x=" << p.x() << endl;
+    if (staff->x1() == 0) {
+        // empty
+        staff->set_x1(line0.x1() + p.x());
+        staff->set_x2(line0.x2() + p.x());
+        assert(staff->x1() <= staff->x2());
+        staff->set_y(y0);
+        staff->set_nlines(lines.size());
+        if (lines.size() == 1) return;
+        staff->set_dy(lines[1].y1() - lines[0].y1());
+        CHECK(staff->dy() > 0);
+    } else {
+        CHECK_EQ(staff->y(), y0);
+        CHECK_EQ(lines.size(), staff->nlines());
+        staff->set_x1(xmin(staff->x1(), line0.x1()+p.x()));
+        staff->set_x2(xmax(staff->x2(), line0.x2()+p.x()));
+    }
+}
 
 //---------------------------------------------------------
 //   y1

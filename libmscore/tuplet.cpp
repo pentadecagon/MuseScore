@@ -1231,5 +1231,26 @@ void Tuplet::addMissingElements()
       if (!missingElementsDuration.isZero())
             qDebug("Tuplet::addMissingElements(): still missing duration of %d/%d", missingElementsDuration.numerator(), missingElementsDuration.denominator());
       }
+void Tuplet::AddToProto(MusicOCR::Staff* mstaff, double mag) const {
+      if (_number) {
+            auto* piece = mstaff->add_piece();
+            const QPointF ncenter = pagePos() + _number->bbox().center() + _number->pos();
+            piece->set_x(ncenter.x() * mag);
+            piece->set_y(ncenter.y() * mag);
+            piece->set_ref1(MusicOCR::Ref1::Tuplet);
+            }
+      if (_hasBracket) {
+            auto* piece1 = mstaff->add_piece();
+            piece1->set_x((pagePos().x() + p1.x()) * mag);
+            piece1->set_y((pagePos().y() + p1.y()) * mag);
+            piece1->set_ref1(MusicOCR::Ref1::TupletLeft);
+
+            auto* piece2 = mstaff->add_piece();
+            piece2->set_x((pagePos().x() + p2.x()) * mag);
+            piece2->set_y((pagePos().y() + p2.y()) * mag);
+            piece2->set_ref1(MusicOCR::Ref1::TupletRight);
+            }
+      }
+
 }  // namespace Ms
 

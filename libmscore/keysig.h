@@ -78,6 +78,7 @@ class KeySig final : public Element {
       virtual QString accessibleInfo() const override;
 
       SymId convertFromOldId(int val) const;
+      void AddToProto(MusicOCR::Staff* mstaff, double mag) const override;
       };
 
 extern const char* keyNames[];

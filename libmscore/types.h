@@ -15,6 +15,8 @@
 
 #include "config.h"
 
+#include "all.h"
+
 namespace Ms {
 #ifdef SCRIPT_INTERFACE
 Q_NAMESPACE

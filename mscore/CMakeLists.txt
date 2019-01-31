@@ -501,6 +501,8 @@ target_link_libraries(mscore
       qzip
       beatroot
       kqoauth
+      MusicOcrPiecesProto
+      glog::glog
       )
 
 add_dependencies(mscore workspaces)

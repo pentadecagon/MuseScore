@@ -27,6 +27,7 @@
 #include "text.h"
 #include "clef.h"
 #include "staff.h"
+#include "stem.h"
 #include "pitchspelling.h"
 #include "arpeggio.h"
 #include "tremolo.h"
@@ -3193,5 +3194,49 @@ void Note::undoUnlink()
       for (Element* e : _el)
             e->undoUnlink();
       }
+using MusicOCR::Ref1;
+using MusicOCR::Ref2;
 
-}
+void Note::AddToProto(MusicOCR::Staff* mstaff, double mag) const {
+    auto* mnote = mstaff->add_piece();
+    mnote->set_line(line());
+    mnote->set_x((pagePos().x() + noteheadCenterX())*mag);
+    mnote->set_y(pagePos().y() * mag);
+    const int duration = (int)chord()->durationType().type();
+    mnote->set_dots(chord()->dots());
+    if (duration < 2 || duration > 8) {
+          mnote->set_piece_error("Note: Bad duration");
+          return;
+          }
+    if (duration == 2 && ! chord()->stem()) {
+          mnote->set_ref2(Ref2::NoteNoStem);
+          return;
+          }
+    if (!chord()->stem()) {
+          mnote->set_piece_error("No stem");
+          return;
+          }
+    auto stem_x = chord()->stem()->pagePos().x() * mag;
+    const bool stem_left = stem_x < mnote->x();
+#if 0
+    const bool up = chord()->up();
+    if (up) {
+          stem_left = ! mirror();
+          }
+    else {
+          stem_left = mirror();
+          }
+      if ((stem_left && stem_x >= mnote->x()) ||
+          (!stem_left && stem_x <= mnote->x())) {
+            cerr << "Bad x, note=" << mnote->x() << " stem=" << stem_x << " stemleft=" << stem_left << endl;
+            abort();
+            }
+#endif
+      if (stem_left) {
+            mnote->set_ref2(Ref2::NoteSL);
+            }
+      else {
+            mnote->set_ref2(Ref2::NoteSR);
+            }
+      }
+} // namespace

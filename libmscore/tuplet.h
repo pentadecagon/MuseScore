@@ -136,6 +136,9 @@ class Tuplet final : public DurationElement {
 
       void sanitizeTuplet();
       void addMissingElements();
+
+      virtual void AddToProto(MusicOCR::Staff* mstaff, double mag) const override;
+
       };
 
 

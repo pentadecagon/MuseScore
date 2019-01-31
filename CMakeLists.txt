@@ -76,6 +76,9 @@ include (UsePkgConfig1) # Defines MACRO(PKGCONFIG1 _package _minVersion _include
 include (FindPulseAudio)
 include (GetCompilerVersion)
 include (CreatePrecompiledHeader)
+add_subdirectory(../main/MusicOCR/proto proto)
+
+find_package(glog REQUIRED)
 
 # For debugging the make system uncomment next line:
 # set(CMAKE_VERBOSE_MAKEFILE ON)
