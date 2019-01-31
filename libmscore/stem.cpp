@@ -397,5 +397,26 @@ QPointF Stem::hookPos() const
       return p;
       }
 
-}
 
+void Stem::AddToProto(MusicOCR::Staff* mstaff, double mag) const {
+      const double x = pagePos().x() * mag;
+      const double y = (pagePos().y() + bbox().center().y()) * mag;
+      if (chord()->noteType() != NoteType::NORMAL) {
+            auto* grace = mstaff->add_piece();
+            grace->set_x(x);
+            grace->set_y(y - 10);
+            if (chord() -> noteType() == NoteType::ACCIACCATURA) {
+                  grace->set_ref1(MusicOCR::Ref1::GraceSlashed);
+                  }
+            else {
+                  grace->set_ref1(MusicOCR::Ref1::Grace);
+                  }
+            }
+      auto* piece = mstaff->add_piece();
+      piece->set_x(x);
+      piece->set_y(y);
+      const int duration = (int)chord()->durationType().type();
+      auto baseref1 = up() ? MusicOCR::Ref1::StemUp_2 : MusicOCR::Ref1::StemDown_2;
+      piece->set_ref1((MusicOCR::Ref1::ERef1)(baseref1 + duration - 3));
+      }
+}

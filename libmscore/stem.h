@@ -72,6 +72,7 @@ class Stem final : public Element {
       QPointF hookPos() const;
       qreal stemLen() const;
       QPointF p2() const              { return line.p2(); }
+      void AddToProto(MusicOCR::Staff* mstaff, double mag) const override;
       };
 
 

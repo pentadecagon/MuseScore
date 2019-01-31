@@ -31,7 +31,6 @@ include_directories(
       ${PROJECT_SOURCE_DIR}/thirdparty
       ${QTSINGLEAPPLICATION_INCLUDE_DIRS}
       )
-  set(CMAKE_CXX_STANDARD 17)
 
 if (SCRIPT_INTERFACE)
       set (SCRIPT_FILES mscorePlugins pluginCreator.cpp qmledit.cpp pluginManager.cpp)
@@ -470,7 +469,6 @@ target_link_libraries(mscore
       beatroot
       kqoauth
       MusicOcrPiecesProto
-      staff
       glog::glog
       )
 

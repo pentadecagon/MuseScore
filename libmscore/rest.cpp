@@ -1022,7 +1022,6 @@ void Rest::AddToProto(MusicOCR::Staff* mstaff, double mag) const {
     if (duration == 14) duration = 2;
     mnote->set_x((pagePos().x() + bbox().left() + bbox().width() * 0.5)*mag);
     mnote->set_y((pagePos().y() + bbox().top() + bbox().height() * 0.5) * mag);
-    mnote->set_duration(duration);
     mnote->set_dots(dots());
     // 14->complete measure, replace by 2
     if (duration >= 2 && duration <= 8) {
