@@ -2542,90 +2542,6 @@ static QRect trim(QImage source, int margin)
 //    return true on success.  Works with editor, shows additional windows.
 //---------------------------------------------------------
 
-const SysStaff* FindSysStaff(const Element* p) {
-//    const MeasureBase* m = p->findMeasureBase();
-    const System* sys = nullptr;
-        for (auto* x = p; x; x = x->parent()) {
-            if (x->isSystem()) {
-                sys = toSystem(x);
-                break;
-            }
-        }
-        const int idx = p->staffIdx();
-    if (sys == nullptr || idx < 0 || idx >= sys->staves()->size()) return 0;
-    return sys->staff(idx);
-}
-
-static std::tuple<double, int, double> SortKey(const MusicOCR::Piece& p) {
-      return {p.x(), p.line(), p.y()};
-      }
-
-static void SortLayout(MusicOCR::Layout* layout) {
-      auto& stafflist = *layout->mutable_staff();
-      std::sort(stafflist.begin(), stafflist.end(), [](const MusicOCR::Staff& a, const MusicOCR::Staff& b) {return a.y() < b.y();});
-      for (auto& staff : *layout->mutable_staff()) {
-            auto& pieces = *staff.mutable_piece();
-            std::sort(pieces.begin(), pieces.end(), [](const MusicOCR::Piece& a, const MusicOCR::Piece& b){return SortKey(a) < SortKey(b);});
-            }
-      }
-
-static void savePieces(const QList<Element*> & vel, const QString& fname, double mag ) {
-      std::map<const SysStaff*, MusicOCR::Staff*> m;
-      MusicOCR::Layout layout;
-      for (const Element* el : vel) {
-            if (!el->visible()) continue;
-            if (const StaffLines* stafflines = dynamic_cast<const StaffLines*>(el)) {
-                  const SysStaff* ss = FindSysStaff(stafflines);
-                  CHECK(ss);
-                  MusicOCR::Staff*& mstaff = m[ss];
-                  if (!mstaff) mstaff = layout.add_staff();
-                  stafflines->updateStaff(mstaff);
-                  }
-            }
-      for (MusicOCR::Staff& ms : *layout.mutable_staff()) {
-            ms.set_x1(ms.x1() * mag);
-            ms.set_x2(ms.x2() * mag);
-            ms.set_dy(ms.dy() * mag);
-            ms.set_y(ms.y() * mag);
-            }
-      static const string ignore[] = {"Text", "Image", "Page", "VBox", "LayoutBreak"};
-      std::set<const Element*> xset;
-      for (const Element* p : vel) {
-            if (!xset.insert(p).second) continue;
-            if (!p->visible()) continue;
-            if (!dynamic_cast<const StaffLines*>(p)) {
-                  auto* ss = FindSysStaff(p);
-                  if (!ss) {
-                        if (std::find(begin(ignore), end(ignore), p->name()) == end(ignore)) {
-                              cerr << "Bad Element: " << p->name() << endl;
-                              }
-                        continue;
-                        }
-                  MusicOCR::Staff* mstaff = m[ss];
-                  if (!mstaff) {
-                        cerr << "incosistent staff " << p->name() << endl;
-                        continue;
-                        }
-                  if (const LedgerLine* ll = dynamic_cast<const LedgerLine*>(p)) {
-                              auto* xll = mstaff -> add_ledger();
-                              xll->set_x1(ll->pagePos().x() * mag);
-                              xll->set_x2(xll->x1() + ll->len() * mag);
-                              xll->set_y(ll->pagePos().y() * mag);
-                        } else {
-                            int n = mstaff->piece_size();
-                              p->AddToProto(mstaff, mag);
-                              for (int k = n; k < mstaff->piece_size(); ++k) {
-                                  mstaff->mutable_piece(k)->set_tick(p->tick());
-                              }
-                        }
-                  }
-            }
-      SortLayout(&layout);
-      std::ofstream ost((fname+".pb").toStdString().c_str(),ios::binary);
-      ost << layout.SerializeAsString();
-      cerr << "Found Staff: " << layout.staff_size() << endl;
-      }
-
 
 bool MuseScore::savePng(Score* score, const QString& name)
       {
@@ -2677,6 +2593,7 @@ bool MuseScore::savePng(Score* score, const QString& name)
 //   savePng with options
 //    return true on success
 //---------------------------------------------------------
+void savePiecesProto(const QList<Element*> & vel, const QString& fname, double mag );
 
 bool MuseScore::savePng(Score* score, QIODevice* device, const QString& fileName, int pageNumber)
       {
@@ -2743,7 +2660,7 @@ bool MuseScore::savePng(Score* score, QIODevice* device, const QString& fileName
             }
       printer.save(device, "png");
       if (fileName != "") {
-            savePieces(pel, fileName, mag_);
+            savePiecesProto(pel, fileName, mag_);
       }
       score->setPrinting(false);
       MScore::pixelRatio = pr;
