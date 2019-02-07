@@ -416,7 +416,12 @@ void Stem::AddToProto(MusicOCR::Staff* mstaff, double mag) const {
       piece->set_x(x);
       piece->set_y(y);
       const int duration = (int)chord()->durationType().type();
-      auto baseref1 = up() ? MusicOCR::Ref1::StemUp_2 : MusicOCR::Ref1::StemDown_2;
-      piece->set_ref1((MusicOCR::Ref1::ERef1)(baseref1 + duration - 3));
+      if (duration > 8) {
+            piece->set_piece_error("Bad Stem duration=" + to_string(duration));
+            }
+      else {
+            auto baseref1 = up() ? MusicOCR::Ref1::StemUp_2 : MusicOCR::Ref1::StemDown_2;
+            piece->set_ref1((MusicOCR::Ref1::ERef1)(baseref1 + duration - 3));
+            }
       }
 }

@@ -65,6 +65,36 @@ void VoltaSegment::layout()
       autoplaceSpannerSegment(spatium() * 1.0);
       }
 
+void VoltaSegment::AddToProto(MusicOCR::Staff* mstaff, double mag) const {
+      const Volta* v = volta();
+      const double y = (pagePos().y() + bbox().top() + bbox().height() * 0.5) * mag;
+      const double x1 = (pagePos().x() + bbox().left()) * mag;
+      const double x2 = (pagePos().x() + bbox().right()) * mag;
+      const int k = v->endings()[0];
+      auto* piece1 = mstaff->add_piece();
+      piece1->set_x(x1);
+      piece1->set_y(y);
+      if (k == 1) {
+            piece1->set_ref1(MusicOCR::Ref1::Volta1);
+            }
+      else if (k == 2) {
+            piece1->set_ref1(MusicOCR::Ref1::Volta2);
+            }
+      else {
+            piece1->set_piece_error("Unexpected Volta: " + to_string(k));
+            return;
+            }
+      auto* piece2 = mstaff->add_piece();
+      piece2->set_x(x2);
+      piece2->set_y(y);
+      if(v->voltaType() == Volta::Type::OPEN) {
+            piece2->set_ref1(MusicOCR::Ref1::VoltaContinue);
+            }
+      else {
+            piece2->set_ref1(MusicOCR::Ref1::VoltaEnd);
+            }
+    }
+
 //---------------------------------------------------------
 //   propertyDelegate
 //---------------------------------------------------------

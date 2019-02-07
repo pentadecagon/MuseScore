@@ -36,7 +36,7 @@ class VoltaSegment final : public TextLineBaseSegment {
       virtual VoltaSegment* clone() const override  { return new VoltaSegment(*this); }
       Volta* volta() const                          { return (Volta*)spanner(); }
       virtual void layout() override;
-
+      virtual void AddToProto(MusicOCR::Staff* mstaff, double mag) const override;
       virtual Element* propertyDelegate(Pid) override;
       };
 
