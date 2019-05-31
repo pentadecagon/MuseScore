@@ -194,6 +194,7 @@ void MidiFile::writeStatus(int nstat, int c)
       //
       //  running status; except for Sysex- and Meta Events
       //
+      _noRunningStatus = true;
       if (_noRunningStatus || (((nstat & 0xf0) != 0xf0) && (nstat != status))) {
             status = nstat;
             put(nstat);

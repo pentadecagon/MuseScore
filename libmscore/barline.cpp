@@ -275,7 +275,6 @@ void BarLine::getY() const
       int staffIdx2       = staffIdx1;
       int nstaves         = score()->nstaves();
       bool spanStaves     = false;
-
       Measure* measure = segment()->measure();
       if (_spanStaff) {
             for (int i2 = staffIdx1 + 1; i2 < nstaves; ++i2)  {
@@ -291,16 +290,18 @@ void BarLine::getY() const
                   }
             }
 
-      if (staffIdx1 != staffIdx2) {
-            BarLine* b2 = toBarLine(segment()->element(staffIdx2 * VOICES));
-            if (b2) b2->_go_up = true;
-            else abort();
-            _go_down = true;
-            }
-
       System* system = measure->system();
       if (!system)
             return;
+      Staff* stx1 = score()->staff(staffIdx1);
+      if (spanStaves && !stx1->invisible() && stx1->part()->show() && measure->visible(staffIdx1))  {
+            BarLine* b2 = toBarLine(segment()->element(staffIdx2 * VOICES));
+            if (b2) b2->_go_up = true;
+            else abort();
+            if (measure->staffLines(staffIdx1)->y1() >= measure->staffLines(staffIdx2)->y1())
+                  abort();
+            _go_down = true;
+            }
 
       // test start and end staff visibility
 

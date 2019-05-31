@@ -109,7 +109,7 @@ static std::tuple<double, int, double> SortKey(const MusicOCR::Piece& p) {
 
 static bool IsSlur(const MusicOCR::Piece& piece) {
       using MusicOCR::Ref1;
-      for (auto x : {Ref1::SlurEndDown, Ref1::SlurEndUp, Ref1::SlurStartDown, Ref1::SlurStartUp}) {
+      for (auto x : {Ref1::SlurEndBelow, Ref1::SlurEndAbove, Ref1::SlurStartBelow, Ref1::SlurStartAbove}) {
             if (piece.ref1() == x) {
                   return true;
                   }
@@ -130,10 +130,10 @@ static void MarkUnsupported(MusicOCR::Staff& staff) {
       using MusicOCR::Ref2;
       using MusicOCR::Piece;
       using MusicOCR::Staff;
-      const int minline = -Staff::TopLineIndex;
-      const int maxline = minline + Staff::StaffTotalHalfLines - 2;
+      const int minline = Staff::MinLine;
+      const int maxline = Staff::MaxLine;
       const double miny = staff.y() - staff.dy() * Staff::TopLineIndex * 0.5;
-      const double maxy = miny + staff.dy() * (Staff::StaffTotalHalfLines - 1) * 0.5;
+      const double maxy = miny + staff.dy() * (Staff::OcrHeight - 1) * 0.5;
       std::map<Ref1::ERef1, double> xref1;
       std::map<std::pair<Ref2::ERef2, int>, double> xref2;
       for (int k=0; k< staff.piece_size(); ++k) {
@@ -230,10 +230,6 @@ void savePiecesProto(const QList<Element*> & vel, const QString& fname, double m
                         continue;
                         }
                   if (const LedgerLine* ll = dynamic_cast<const LedgerLine*>(p)) {
-                              auto* xll = mstaff -> add_ledger();
-                              xll->set_x1(ll->pagePos().x() * mag);
-                              xll->set_x2(xll->x1() + ll->len() * mag);
-                              xll->set_y(ll->pagePos().y() * mag);
                         } else {
                             int n = mstaff->piece_size();
                               p->AddToProto(mstaff, mag);

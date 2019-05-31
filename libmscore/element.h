@@ -37,7 +37,7 @@ class XmlWriter;
 enum class SymId;
 enum class Pid;
 enum class OffsetType : char;
-
+namespace MusicOCR=MusicOcr;
 //---------------------------------------------------------
 //   Grip
 //---------------------------------------------------------
